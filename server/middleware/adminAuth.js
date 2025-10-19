@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../../admin/.env.admin') });
+require('dotenv').config({ path: path.join(__dirname, '../../client/admin/.env.admin') });
 
 // Protect admin routes
 exports.protect = async (req, res, next) => {

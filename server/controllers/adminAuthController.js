@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const path = require('path');
 const { sendPasswordResetEmail, sendWelcomeEmail } = require('../utils/adminEmailService');
-require('dotenv').config({ path: path.join(__dirname, '../../admin/.env.admin') });
+require('dotenv').config({ path: path.join(__dirname, '../../client/admin/.env.admin') });
 
 // Generate JWT Token
 const generateToken = (adminId) => {

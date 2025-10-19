@@ -1410,6 +1410,74 @@ a:hover {
   color: var(--color-text-secondary);
 }
 
+/* Auth Pages - Enhanced Visibility for Light/Dark Mode */
+.auth-card h1,
+.auth-card h2,
+.auth-card h3 {
+  color: var(--color-text);
+}
+
+.auth-card .form-label {
+  color: var(--color-text);
+}
+
+.auth-card .form-control {
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.auth-card .form-control::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.6;
+}
+
+.auth-card .form-control:focus {
+  border-color: var(--color-primary);
+  background-color: var(--color-surface);
+}
+
+/* Forgot Password & Reset Password Pages */
+.auth-container .auth-card {
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Recovery Method Cards */
+.recovery-card {
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.recovery-card.active {
+  background: var(--color-surface);
+  border-color: var(--color-primary);
+}
+
+.recovery-card:hover {
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+}
+
+/* Step Indicators */
+.step-item div {
+  background: var(--color-secondary);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.step-item.active div {
+  background: var(--color-primary);
+  color: var(--color-btn-primary-text);
+  border-color: var(--color-primary);
+}
+
+/* Ensure text is visible in inline styles */
+.auth-card small {
+  color: var(--color-text-secondary) !important;
+}
+
 /* Dashboard */
 .dashboard-container {
   padding: var(--space-32);

@@ -75,8 +75,8 @@ if (process.env.NODE_ENV === 'development') {
 // Serve static files from client directory
 app.use(express.static(path.join(__dirname, '../client')));
 
-// Serve admin static files
-app.use('/admin', express.static(path.join(__dirname, '../admin')));
+// Serve admin static files (now inside client folder)
+app.use('/admin', express.static(path.join(__dirname, '../client/admin')));
 
 // API Routes
 app.use('/api/auth', authRoutes);

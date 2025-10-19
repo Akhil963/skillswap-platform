@@ -1,6 +1,6 @@
 const nodemailer = require('nodemailer');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '../../admin/.env.admin') });
+require('dotenv').config({ path: path.join(__dirname, '../../client/admin/.env.admin') });
 
 // Create reusable transporter
 const createTransporter = () => {
