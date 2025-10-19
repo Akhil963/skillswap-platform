@@ -27,7 +27,7 @@ Demo
 ----
 Live demo: (Add a link to your deployed site here)
 Screenshot:
-![screenshot](docs/screenshot.png) <!-- Replace with actual screenshot path -->
+![screenshot]([docs/screenshot.png](https://github.com/Akhil963/skillswap-platform/blob/main/client/assets/skillExchange.png)) <!-- Replace with actual screenshot path -->
 
 Features
 --------
@@ -135,7 +135,7 @@ Contact
 -------
 Maintainer: Akhil963  
 GitHub: https://github.com/Akhil963  
-Email: (add your email here)
+Email: akhileshbhandakkar@gmail.com
 
 Acknowledgements
 ----------------
