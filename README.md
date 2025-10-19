@@ -27,7 +27,7 @@ Demo
 ----
 Live demo: (Add a link to your deployed site here)
 Screenshot:
-https://github.com/Akhil963/skillswap-platform/blob/main/client/assets/skillExchange.png <!-- Replace with actual screenshot path -->
+client/assets/skillExchange.png <!-- Replace with actual screenshot path -->
 
 Features
 --------
