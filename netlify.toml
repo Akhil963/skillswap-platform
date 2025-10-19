@@ -25,14 +25,9 @@
   from = "/api/*"
   to = "/.netlify/functions/api/:splat"
   status = 200
+  force = true
 
-# Admin panel routes
-[[redirects]]
-  from = "/admin/*"
-  to = "/admin/:splat"
-  status = 200
-
-# SPA fallback - all other routes to index.html
+# SPA fallback - all other routes to index.html (must be last)
 [[redirects]]
   from = "/*"
   to = "/index.html"
