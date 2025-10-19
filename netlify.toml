@@ -1,0 +1,84 @@
+# ===================================
+# NETLIFY CONFIGURATION - SKILLSWAP
+# ===================================
+
+[build]
+  # Build command
+  command = "npm install"
+  
+  # Publish directory (your static files)
+  publish = "client"
+  
+  # Functions directory (for serverless API)
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "18"
+  NPM_VERSION = "9"
+
+# ===================================
+# REDIRECT RULES
+# ===================================
+
+# API requests to serverless functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+# Admin panel routes
+[[redirects]]
+  from = "/admin/*"
+  to = "/admin/:splat"
+  status = 200
+
+# SPA fallback - all other routes to index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# ===================================
+# HEADERS FOR SECURITY
+# ===================================
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+
+# ===================================
+# DEVELOPMENT SETTINGS
+# ===================================
+
+[dev]
+  command = "npm run dev"
+  port = 5000
+  targetPort = 5000
+  autoLaunch = true
+
+# ===================================
+# CONTEXT-SPECIFIC SETTINGS
+# ===================================
+
+# Production settings
+[context.production.environment]
+  NODE_ENV = "production"
+
+# Deploy preview settings
+[context.deploy-preview.environment]
+  NODE_ENV = "development"
+
+# Branch deploy settings
+[context.branch-deploy.environment]
+  NODE_ENV = "development"
