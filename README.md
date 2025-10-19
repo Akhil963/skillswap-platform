@@ -25,7 +25,7 @@ Table of contents
 
 Demo
 ----
-Live demo: (Add a link to your deployed site here)
+Live demo: https://skillexchangepf.netlify.app
 
 Screenshot:
 ![SkillSwap screenshot](client/assets/skillExchange.png)
