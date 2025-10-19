@@ -1,6 +1,6 @@
 # SkillSwap Platform
 
-A simple, user-friendly platform to exchange skills — teach what you know and learn what you don't. SkillSwap is built with HTML, CSS, and JavaScript and is intended as a lightweight full‑stack / frontend project for sharing skills, messaging other users, and organizing informal learning sessions.
+A simple, user-friendly platform to exchange skills — teach what you know and learn what you don't. SkillSwap is built with HTML, CSS, and JavaScript and is intended as a lightweight full‑stack / [...]
 
 [![Project languages](https://img.shields.io/badge/JavaScript-50%25-yellow?logo=javascript)](#)
 [![Built with HTML/CSS](https://img.shields.io/badge/HTML%20%2F%20CSS-49%25-orange?logo=html5)](#)
@@ -26,8 +26,9 @@ Table of contents
 Demo
 ----
 Live demo: (Add a link to your deployed site here)
+
 Screenshot:
-![screenshot](docs/screenshot.png) <!-- Replace with actual screenshot path -->
+![SkillSwap screenshot](client/assets/skillExchange.png)
 
 Features
 --------
@@ -135,7 +136,7 @@ Contact
 -------
 Maintainer: Akhil963  
 GitHub: https://github.com/Akhil963  
-Email: (add your email here)
+Email: akhileshbhandakkar@gmail.com
 
 Acknowledgements
 ----------------

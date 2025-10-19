@@ -353,18 +353,6 @@ async function handleLogin(e) {
     AppState.currentUser = data.user;
     localStorage.setItem('token', data.token);
     
-    // Debug: Log user data to verify all fields are present
-    console.log('✅ Login successful - User data:', {
-      name: AppState.currentUser.name,
-      email: AppState.currentUser.email,
-      tokens_earned: AppState.currentUser.tokens_earned,
-      total_exchanges: AppState.currentUser.total_exchanges,
-      rating: AppState.currentUser.rating,
-      badges: AppState.currentUser.badges,
-      skills_offered: AppState.currentUser.skills_offered?.length || 0,
-      skills_wanted: AppState.currentUser.skills_wanted?.length || 0
-    });
-    
     // Remember email if checkbox is checked
     if (rememberMe) {
       localStorage.setItem('rememberedEmail', email);
@@ -412,18 +400,6 @@ async function handleSignup(e) {
     AppState.token = data.token;
     AppState.currentUser = data.user;
     localStorage.setItem('token', data.token);
-
-    // Debug: Log user data to verify all fields are present
-    console.log('✅ Registration successful - User data:', {
-      name: AppState.currentUser.name,
-      email: AppState.currentUser.email,
-      tokens_earned: AppState.currentUser.tokens_earned,
-      total_exchanges: AppState.currentUser.total_exchanges,
-      rating: AppState.currentUser.rating,
-      badges: AppState.currentUser.badges,
-      skills_offered: AppState.currentUser.skills_offered?.length || 0,
-      skills_wanted: AppState.currentUser.skills_wanted?.length || 0
-    });
 
     updateNavigation();
     
@@ -812,9 +788,6 @@ async function showTokenHistory() {
       : '<div style="padding: 24px; text-align: center; color: var(--color-text-secondary);">No token history yet</div>';
 
     showNotification(`Token Balance: ${tokenData.current} | Total Earned: ${tokenData.total_earned}`, 'success');
-    
-    // You can also show in a modal if you want
-    console.log('Token History:', tokenData);
   } catch (error) {
     showNotification('Failed to load token history', 'error');
   }

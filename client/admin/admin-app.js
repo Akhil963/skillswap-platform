@@ -823,8 +823,6 @@ async function loadSkills(search = '', category = 'all') {
         }
         
         displaySkills(filteredSkills);
-        
-        console.log(`✅ Loaded ${filteredSkills.length} skills from ${allUsers.length} users`);
     } catch (error) {
         console.error('Error loading skills:', error);
         const container = document.getElementById('skillsGrid');
@@ -1147,7 +1145,6 @@ async function loadAnalytics() {
                 renderChart('exchangeStatsCanvas', 'doughnut', data.charts.exchangeStatus);
                 renderChart('skillsDistCanvas', 'bar', data.charts.popularSkills);
                 renderChart('ratingDistCanvas', 'line', data.charts.monthlyActivity);
-                console.log('✅ Analytics: 4 charts rendered successfully');
             } else {
                 console.warn('⚠️ Chart.js not available or no chart data');
             }
@@ -1324,8 +1321,6 @@ function loadDemoAnalytics() {
         renderChart('exchangeStatsCanvas', 'doughnut', exchangeStatusData);
         renderChart('skillsDistCanvas', 'bar', popularSkillsData);
         renderChart('ratingDistCanvas', 'line', monthlyActivityData);
-        
-        console.log('✅ Analytics: 4 demo charts rendered successfully');
     } else {
         console.warn('⚠️ Chart.js not available');
     }
@@ -2269,8 +2264,6 @@ function showError(message) {
 }
 
 function showSuccess(message) {
-    console.log('Admin Success:', message);
-    
     // Create a toast-style notification
     const successDiv = document.createElement('div');
     successDiv.style.cssText = `
