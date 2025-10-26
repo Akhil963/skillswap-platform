@@ -53,16 +53,18 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
+// Rate limiting - Increased limits for better UX
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 500, // Increased from 100 to 500 requests per window
   message: JSON.stringify({
     success: false,
     message: 'Too many requests from this IP, please try again later.'
   }),
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: false, // Count all requests
+  skipFailedRequests: false
 });
 app.use('/api/', limiter);
 

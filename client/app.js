@@ -18,7 +18,10 @@ const AppState = {
   activeConversation: null,
   requestQueue: [],
   isProcessingQueue: false,
-  rateLimitDelay: 100 // Delay between requests in ms
+  rateLimitDelay: 100, // Delay between requests in ms
+  cache: {}, // Cache for API responses
+  cacheExpiry: 5 * 60 * 1000, // 5 minutes cache
+  pendingRequests: {} // Track pending requests to avoid duplicates
 };
 
 // ======================
@@ -60,8 +63,26 @@ function queueRequest(executeFunction) {
   });
 }
 
-// Make API request with authentication
+// Make API request with authentication, caching, and retry logic
 async function apiRequest(endpoint, options = {}) {
+  // Create cache key
+  const cacheKey = `${options.method || 'GET'}_${endpoint}_${JSON.stringify(options.body || '')}`;
+  
+  // Check if request is already pending
+  if (AppState.pendingRequests[cacheKey]) {
+    return AppState.pendingRequests[cacheKey];
+  }
+  
+  // Check cache for GET requests
+  if ((!options.method || options.method === 'GET') && AppState.cache[cacheKey]) {
+    const cached = AppState.cache[cacheKey];
+    if (Date.now() - cached.timestamp < AppState.cacheExpiry) {
+      return cached.data;
+    }
+    // Clear expired cache
+    delete AppState.cache[cacheKey];
+  }
+
   const config = {
     headers: {
       'Content-Type': 'application/json',
@@ -70,44 +91,87 @@ async function apiRequest(endpoint, options = {}) {
     ...options
   };
 
-  try {
-    const response = await fetch(`${API_URL}${endpoint}`, config);
-    
-    // Handle rate limiting
-    if (response.status === 429) {
-      const retryAfter = response.headers.get('Retry-After') || 60;
-      throw new Error(`Too many requests. Please wait ${retryAfter} seconds and try again.`);
-    }
-
-    // Check if response is JSON
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      // Handle non-JSON responses (like HTML error pages)
-      const text = await response.text();
-      console.error('Non-JSON response:', text);
-      throw new Error('Server returned an invalid response. Please try again.');
-    }
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      // Handle validation errors with multiple messages
-      if (data.errors && Array.isArray(data.errors)) {
-        throw new Error(data.errors.join(', '));
+  // Create the request promise
+  const requestPromise = (async () => {
+    try {
+      const response = await fetch(`${API_URL}${endpoint}`, config);
+      
+      // Handle rate limiting with retry
+      if (response.status === 429) {
+        const retryAfter = parseInt(response.headers.get('Retry-After') || '60', 10);
+        
+        // If retry time is reasonable (less than 5 minutes), wait and retry
+        if (retryAfter <= 300) {
+          showNotification(`Rate limit reached. Retrying in ${retryAfter} seconds...`, 'warning');
+          await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+          
+          // Retry the request
+          delete AppState.pendingRequests[cacheKey];
+          return apiRequest(endpoint, options);
+        } else {
+          throw new Error(`Too many requests. Please wait ${retryAfter} seconds and try again.`);
+        }
       }
-      throw new Error(data.message || 'API request failed');
-    }
 
-    return data;
-  } catch (error) {
-    console.error('API Error:', error);
-    
-    // If it's a network error
-    if (error.message === 'Failed to fetch') {
-      throw new Error('Unable to connect to server. Please check your internet connection.');
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
+        throw new Error('Server returned an invalid response. Please try again.');
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.errors && Array.isArray(data.errors)) {
+          throw new Error(data.errors.join(', '));
+        }
+        throw new Error(data.message || 'API request failed');
+      }
+
+      // Cache successful GET requests
+      if (!options.method || options.method === 'GET') {
+        AppState.cache[cacheKey] = {
+          data: data,
+          timestamp: Date.now()
+        };
+      }
+
+      return data;
+    } catch (error) {
+      console.error('API Error:', error);
+      
+      if (error.message === 'Failed to fetch') {
+        throw new Error('Unable to connect to server. Please check your internet connection.');
+      }
+      
+      throw error;
+    } finally {
+      // Clear pending request
+      delete AppState.pendingRequests[cacheKey];
     }
-    
-    throw error;
+  })();
+
+  // Store pending request
+  AppState.pendingRequests[cacheKey] = requestPromise;
+
+  return requestPromise;
+  }
+}
+
+// Clear cache function
+function clearCache(pattern = null) {
+  if (pattern) {
+    // Clear specific cache entries matching pattern
+    Object.keys(AppState.cache).forEach(key => {
+      if (key.includes(pattern)) {
+        delete AppState.cache[key];
+      }
+    });
+  } else {
+    // Clear all cache
+    AppState.cache = {};
   }
 }
 
@@ -148,11 +212,11 @@ async function initializeApp() {
     // Check if user is logged in
     await checkAuth();
 
-    // Load platform stats
-    await loadPlatformStats();
-
-    // Load categories
-    await loadCategories();
+    // Load critical data in parallel with graceful error handling
+    await Promise.allSettled([
+      loadPlatformStats(),
+      loadCategories()
+    ]);
 
     // Set up event listeners
     setupEventListeners();
