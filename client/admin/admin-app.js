@@ -1182,8 +1182,6 @@ async function deleteExchange(exchangeId) {
         showError('Error deleting exchange');
     }
 }
-    }
-}
 
 // ===== SKILLS MANAGEMENT =====
 async function loadSkills(search = '', category = 'all') {
