@@ -186,12 +186,26 @@
             <div class="page-header">
                 <h2>User Management</h2>
                 <div class="page-actions">
-                    <input type="text" class="search-input" id="userSearch" placeholder="Search users..." oninput="searchUsers()">
+                    <input type="text" class="search-input" id="userSearch" placeholder="🔍 Search users..." oninput="searchUsers()">
                     <select class="filter-select" id="userFilter" onchange="filterUsers()">
                         <option value="all">All Users</option>
                         <option value="active">Active</option>
                         <option value="verified">Verified</option>
                         <option value="unverified">Unverified</option>
+                    </select>
+                    <select class="filter-select" id="userSort" onchange="sortUsersBy(this.value)">
+                        <option value="createdAt">Sort: Joined Date</option>
+                        <option value="name">Sort: Name</option>
+                        <option value="email">Sort: Email</option>
+                        <option value="location">Sort: Location</option>
+                        <option value="rating">Sort: Rating</option>
+                        <option value="exchanges">Sort: Exchanges</option>
+                        <option value="skills">Sort: Skills</option>
+                        <option value="status">Sort: Status</option>
+                    </select>
+                    <select class="filter-select" id="userSortOrder" onchange="toggleSortOrder()" style="width: auto;">
+                        <option value="desc">↓ Desc</option>
+                        <option value="asc">↑ Asc</option>
                     </select>
                 </div>
             </div>
@@ -200,18 +214,19 @@
                     <thead>
                         <tr>
                             <th>User</th>
-                            <th>Email</th>
                             <th>Location</th>
                             <th>Skills</th>
                             <th>Exchanges</th>
                             <th>Rating</th>
+                            <th>Status</th>
                             <th>Joined</th>
+                            <th>Reviews</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="usersTableBody">
                         <tr>
-                            <td colspan="8" class="loading">Loading users...</td>
+                            <td colspan="10" class="loading">Loading users...</td>
                         </tr>
                     </tbody>
                 </table>

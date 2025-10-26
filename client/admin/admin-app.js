@@ -461,10 +461,10 @@ function displayRecentExchanges(exchanges) {
 }
 
 // ===== USERS MANAGEMENT =====
-async function loadUsers(search = '', filter = 'all') {
+async function loadUsers(search = '', filter = 'all', sortBy = 'createdAt', sortOrder = 'desc') {
     try {
         const tableBody = document.getElementById('usersTableBody');
-        tableBody.innerHTML = '<tr><td colspan="8" class="loading">⏳ Loading users...</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="10" class="loading">⏳ Loading users...</td></tr>';
         
         const url = `/api/admin/users?search=${encodeURIComponent(search)}&filter=${filter}`;
         const response = await fetch(url);
@@ -477,6 +477,9 @@ async function loadUsers(search = '', filter = 'all') {
         
         if (data.success) {
             allUsers = data.users || [];
+            
+            // Apply client-side sorting
+            sortUsers(allUsers, sortBy, sortOrder);
             displayUsers(allUsers);
             
             // Update badge count
@@ -490,43 +493,146 @@ async function loadUsers(search = '', filter = 'all') {
     } catch (error) {
         console.error('Error loading users:', error);
         const tableBody = document.getElementById('usersTableBody');
-        tableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 40px; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
     }
+}
+
+function sortUsers(users, sortBy, sortOrder) {
+    users.sort((a, b) => {
+        let aVal, bVal;
+        
+        switch(sortBy) {
+            case 'name':
+                aVal = (a.fullName || '').toLowerCase();
+                bVal = (b.fullName || '').toLowerCase();
+                break;
+            case 'email':
+                aVal = (a.email || '').toLowerCase();
+                bVal = (b.email || '').toLowerCase();
+                break;
+            case 'location':
+                aVal = (a.location || '').toLowerCase();
+                bVal = (b.location || '').toLowerCase();
+                break;
+            case 'rating':
+                aVal = a.rating || 0;
+                bVal = b.rating || 0;
+                break;
+            case 'exchanges':
+                aVal = a.totalExchanges || 0;
+                bVal = b.totalExchanges || 0;
+                break;
+            case 'skills':
+                aVal = (a.skillsOffered?.length || 0) + (a.skillsWanted?.length || 0);
+                bVal = (b.skillsOffered?.length || 0) + (b.skillsWanted?.length || 0);
+                break;
+            case 'status':
+                aVal = a.isActive ? 1 : 0;
+                bVal = b.isActive ? 1 : 0;
+                break;
+            case 'createdAt':
+            default:
+                aVal = new Date(a.createdAt || 0);
+                bVal = new Date(b.createdAt || 0);
+                break;
+        }
+        
+        if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+        return 0;
+    });
 }
 
 function displayUsers(users) {
     const tableBody = document.getElementById('usersTableBody');
     
     if (!users || users.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px;">No users found</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 40px;">No users found</td></tr>';
         return;
     }
     
-    const html = users.map(user => `
+    const html = users.map(user => {
+        const statusBadge = user.isActive 
+            ? '<span class="status-badge status-active">🟢 Active</span>' 
+            : '<span class="status-badge status-inactive">🔴 Inactive</span>';
+        
+        const skillsOffered = user.skillsOffered || [];
+        const skillsWanted = user.skillsWanted || [];
+        const totalSkills = skillsOffered.length + skillsWanted.length;
+        
+        const skillsDisplay = totalSkills > 0 
+            ? `<span title="Offered: ${skillsOffered.length}, Wanted: ${skillsWanted.length}">
+                🎯 ${skillsOffered.length} / 📚 ${skillsWanted.length}
+               </span>`
+            : '<span style="color: var(--text-secondary);">No skills</span>';
+        
+        const ratingStars = user.rating ? '⭐'.repeat(Math.round(user.rating)) : '☆☆☆☆☆';
+        const ratingDisplay = user.rating 
+            ? `<span title="${user.rating.toFixed(2)} stars">${ratingStars} ${user.rating.toFixed(1)}</span>`
+            : '<span style="color: var(--text-secondary);">No rating</span>';
+        
+        const joinedDate = user.createdAt 
+            ? new Date(user.createdAt).toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric' 
+              })
+            : 'N/A';
+        
+        const lastActive = user.lastActive 
+            ? `<div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+                Last: ${new Date(user.lastActive).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+               </div>`
+            : '';
+        
+        return `
         <tr>
             <td>
                 <div class="user-cell">
-                    <img src="${user.profilePicture || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.fullName || 'User')}" class="user-avatar" alt="${user.fullName || 'User'}" onerror="this.src='https://ui-avatars.com/api/?name=User'">
+                    <img src="${user.profilePicture || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.fullName || 'User')}" 
+                         class="user-avatar" 
+                         alt="${user.fullName || 'User'}" 
+                         onerror="this.src='https://ui-avatars.com/api/?name=User'">
                     <div class="user-info">
                         <span class="user-name">${user.fullName || 'Unknown'}</span>
                         <span class="user-email">${user.email || 'N/A'}</span>
                     </div>
                 </div>
             </td>
-            <td>${user.email || 'N/A'}</td>
-            <td>${user.location || 'Not specified'}</td>
-            <td>${(user.skillsOffered?.length || 0)} / ${(user.skillsWanted?.length || 0)}</td>
-            <td>${user.totalExchanges || 0}</td>
-            <td>⭐ ${user.rating ? user.rating.toFixed(1) : 'N/A'}</td>
-            <td>${user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</td>
+            <td>${user.location || '<span style="color: var(--text-secondary);">Not specified</span>'}</td>
+            <td style="text-align: center;">${skillsDisplay}</td>
+            <td style="text-align: center;">
+                <span class="badge" style="background: var(--primary); color: white; padding: 4px 8px; border-radius: 12px;">
+                    ${user.totalExchanges || 0}
+                </span>
+            </td>
+            <td style="text-align: center;">${ratingDisplay}</td>
+            <td style="text-align: center;">${statusBadge}</td>
+            <td>
+                <div>${joinedDate}</div>
+                ${lastActive}
+            </td>
+            <td style="text-align: center;">
+                <span class="badge" style="background: ${(user.reviews?.length || 0) > 0 ? 'var(--success)' : 'var(--text-secondary)'}; color: white; padding: 4px 8px; border-radius: 12px;">
+                    ${user.reviews?.length || 0}
+                </span>
+            </td>
             <td>
                 <div class="action-buttons">
-                    <button class="btn-action btn-edit" onclick="editUser('${user._id}')" title="Edit User">✏️</button>
-                    <button class="btn-action btn-delete" onclick="deleteUser('${user._id}', '${(user.fullName || 'User').replace(/'/g, "\\'")}')" title="Delete User">🗑️</button>
+                    <button class="btn-action btn-view" onclick="viewUserDetails('${user._id}')" title="View Details">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn-action btn-edit" onclick="editUser('${user._id}')" title="Edit User">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn-action btn-delete" onclick="deleteUser('${user._id}', '${(user.fullName || 'User').replace(/'/g, "\\'")}')" title="Delete User">
+                        <i class="fas fa-trash"></i>
+                    </button>
                 </div>
             </td>
         </tr>
-    `).join('');
+        `;
+    }).join('');
     
     tableBody.innerHTML = html;
 }
@@ -534,13 +640,153 @@ function displayUsers(users) {
 function searchUsers() {
     const searchValue = document.getElementById('userSearch').value;
     const filterValue = document.getElementById('userFilter').value;
-    loadUsers(searchValue, filterValue);
+    const sortBy = document.getElementById('userSort')?.value || 'createdAt';
+    const sortOrder = document.getElementById('userSortOrder')?.value || 'desc';
+    loadUsers(searchValue, filterValue, sortBy, sortOrder);
 }
 
 function filterUsers() {
     const searchValue = document.getElementById('userSearch').value;
     const filterValue = document.getElementById('userFilter').value;
-    loadUsers(searchValue, filterValue);
+    const sortBy = document.getElementById('userSort')?.value || 'createdAt';
+    const sortOrder = document.getElementById('userSortOrder')?.value || 'desc';
+    loadUsers(searchValue, filterValue, sortBy, sortOrder);
+}
+
+function sortUsersBy(sortBy) {
+    const searchValue = document.getElementById('userSearch')?.value || '';
+    const filterValue = document.getElementById('userFilter')?.value || 'all';
+    const sortOrder = document.getElementById('userSortOrder')?.value || 'desc';
+    loadUsers(searchValue, filterValue, sortBy, sortOrder);
+}
+
+function toggleSortOrder() {
+    const sortOrderSelect = document.getElementById('userSortOrder');
+    const currentOrder = sortOrderSelect.value;
+    sortOrderSelect.value = currentOrder === 'asc' ? 'desc' : 'asc';
+    
+    const searchValue = document.getElementById('userSearch')?.value || '';
+    const filterValue = document.getElementById('userFilter')?.value || 'all';
+    const sortBy = document.getElementById('userSort')?.value || 'createdAt';
+    loadUsers(searchValue, filterValue, sortBy, sortOrderSelect.value);
+}
+
+async function viewUserDetails(userId) {
+    try {
+        const response = await fetch(`/api/admin/users/${userId}`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.user) {
+            const user = data.user;
+            
+            const skillsOfferedHTML = (user.skillsOffered || []).length > 0
+                ? user.skillsOffered.map(skill => `<span class="skill-tag">🎯 ${skill}</span>`).join('')
+                : '<p style="color: var(--text-secondary);">No skills offered</p>';
+            
+            const skillsWantedHTML = (user.skillsWanted || []).length > 0
+                ? user.skillsWanted.map(skill => `<span class="skill-tag">📚 ${skill}</span>`).join('')
+                : '<p style="color: var(--text-secondary);">No skills wanted</p>';
+            
+            const reviewsHTML = (user.reviews || []).length > 0
+                ? user.reviews.map(review => `
+                    <div style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <strong>${review.reviewerName || 'Anonymous'}</strong>
+                            <span>${'⭐'.repeat(review.rating || 0)}</span>
+                        </div>
+                        <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">${review.comment || 'No comment'}</p>
+                        <small style="color: var(--text-secondary);">${new Date(review.createdAt).toLocaleDateString()}</small>
+                    </div>
+                `).join('')
+                : '<p style="color: var(--text-secondary);">No reviews yet</p>';
+            
+            const modalBody = document.getElementById('editUserForm');
+            modalBody.innerHTML = `
+                <div class="user-details-view">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <img src="${user.profilePicture || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.fullName || 'User')}" 
+                             style="width: 120px; height: 120px; border-radius: 50%; border: 4px solid var(--primary);"
+                             onerror="this.src='https://ui-avatars.com/api/?name=User'">
+                        <h2 style="margin: 16px 0 8px 0;">${user.fullName || 'Unknown'}</h2>
+                        <p style="color: var(--text-secondary); margin: 0;">${user.email || 'N/A'}</p>
+                        <div style="margin-top: 12px;">
+                            ${user.isActive 
+                                ? '<span class="status-badge status-active">🟢 Active</span>' 
+                                : '<span class="status-badge status-inactive">🔴 Inactive</span>'}
+                        </div>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h3>📍 Location</h3>
+                        <p>${user.location || 'Not specified'}</p>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h3>📊 Statistics</h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+                            <div style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 24px; font-weight: bold; color: var(--primary);">${user.totalExchanges || 0}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Total Exchanges</div>
+                            </div>
+                            <div style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 24px; font-weight: bold; color: var(--warning);">⭐ ${user.rating ? user.rating.toFixed(1) : 'N/A'}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Rating</div>
+                            </div>
+                            <div style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 24px; font-weight: bold; color: var(--success);">${user.reviews?.length || 0}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Reviews</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h3>🎯 Skills Offered (${(user.skillsOffered || []).length})</h3>
+                        <div class="skills-container">
+                            ${skillsOfferedHTML}
+                        </div>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h3>📚 Skills Wanted (${(user.skillsWanted || []).length})</h3>
+                        <div class="skills-container">
+                            ${skillsWantedHTML}
+                        </div>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h3>💬 Bio</h3>
+                        <p style="white-space: pre-wrap;">${user.bio || 'No bio provided'}</p>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h3>⭐ Reviews (${(user.reviews || []).length})</h3>
+                        ${reviewsHTML}
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h3>📅 Account Information</h3>
+                        <p><strong>Joined:</strong> ${user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}</p>
+                        <p><strong>Last Active:</strong> ${user.lastActive ? new Date(user.lastActive).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}</p>
+                        <p><strong>User ID:</strong> <code style="background: var(--bg-secondary); padding: 2px 6px; border-radius: 4px; font-size: 12px;">${user._id}</code></p>
+                    </div>
+                </div>
+            `;
+            
+            openModal('editUserModal');
+        } else {
+            showError(data.message || 'Failed to load user details');
+        }
+    } catch (error) {
+        console.error('Error loading user details:', error);
+        showError('Error loading user details: ' + error.message);
+    }
 }
 
 async function editUser(userId) {
@@ -627,30 +873,59 @@ function deleteUser(userId, userName) {
     const confirmMsg = document.getElementById('confirmMessage');
     const confirmBtn = document.getElementById('confirmBtn');
     
-    confirmMsg.textContent = `Are you sure you want to delete ${userName}? This action cannot be undone.`;
-    confirmBtn.onclick = () => confirmDeleteUser(userId);
+    confirmMsg.innerHTML = `
+        <p>Are you sure you want to delete this user?</p>
+        <p style="margin-top: 10px; font-weight: 600; font-size: 16px;">${userName}</p>
+        <p style="color: var(--danger); margin-top: 10px; font-weight: 500;">⚠️ This will also delete:</p>
+        <ul style="text-align: left; margin: 10px 0; padding-left: 20px; color: var(--text-secondary);">
+            <li>All user's skills</li>
+            <li>All user's exchanges</li>
+            <li>All user's messages</li>
+            <li>User's profile data</li>
+        </ul>
+        <p style="color: var(--danger); font-weight: 600;">This action cannot be undone!</p>
+    `;
+    confirmBtn.onclick = () => confirmDeleteUser(userId, userName);
     
     openModal('confirmModal');
 }
 
-async function confirmDeleteUser(userId) {
+async function confirmDeleteUser(userId, userName) {
     try {
+        // Show loading state
+        const confirmBtn = document.getElementById('confirmBtn');
+        const originalText = confirmBtn.innerHTML;
+        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+        confirmBtn.disabled = true;
+        
         const response = await fetch(`/api/admin/users/${userId}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: getAuthHeaders()
         });
         
         const data = await response.json();
         
         if (data.success) {
             closeModal('confirmModal');
-            loadUsers();
-            showSuccess('User deleted successfully');
+            showSuccess(`✅ User "${userName}" deleted successfully!`);
+            
+            // Reload users with current filters
+            const searchValue = document.getElementById('userSearch')?.value || '';
+            const filterValue = document.getElementById('userFilter')?.value || 'all';
+            loadUsers(searchValue, filterValue);
         } else {
             showError(data.message || 'Failed to delete user');
+            confirmBtn.innerHTML = originalText;
+            confirmBtn.disabled = false;
         }
     } catch (error) {
         console.error('Error deleting user:', error);
-        showError('Error deleting user');
+        showError('Error deleting user: ' + error.message);
+        
+        // Reset button
+        const confirmBtn = document.getElementById('confirmBtn');
+        confirmBtn.innerHTML = 'Confirm';
+        confirmBtn.disabled = false;
     }
 }
 
@@ -696,22 +971,81 @@ function displayExchanges(exchanges) {
         return;
     }
     
-    const html = exchanges.map(exchange => `
+    const html = exchanges.map(exchange => {
+        // Get requester and provider info
+        const requester = exchange.requester_id || {};
+        const provider = exchange.provider_id || {};
+        
+        // Format status with proper styling
+        const statusClass = exchange.status || 'pending';
+        const statusDisplay = (exchange.status || 'pending').charAt(0).toUpperCase() + (exchange.status || 'pending').slice(1);
+        
+        // Format date
+        const createdDate = exchange.created_date || exchange.createdAt;
+        const dateDisplay = createdDate ? new Date(createdDate).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        }) : 'N/A';
+        
+        return `
         <tr>
-            <td>#${exchange._id ? exchange._id.slice(-6) : 'N/A'}</td>
-            <td>${exchange.requester?.fullName || 'Unknown'}</td>
-            <td>${exchange.provider?.fullName || 'Unknown'}</td>
-            <td>${exchange.skillOffered || 'N/A'} ↔️ ${exchange.skillWanted || 'N/A'}</td>
-            <td><span class="status-badge ${exchange.status || 'pending'}">${exchange.status || 'pending'}</span></td>
-            <td>${exchange.createdAt ? new Date(exchange.createdAt).toLocaleDateString() : 'N/A'}</td>
+            <td>
+                <div class="user-cell">
+                    <img src="${requester.profilePicture || requester.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(requester.fullName || requester.name || 'User')}" 
+                         class="user-avatar" 
+                         alt="${requester.fullName || requester.name || 'User'}" 
+                         onerror="this.src='https://ui-avatars.com/api/?name=User'">
+                    <div class="user-info">
+                        <span class="user-name">${requester.fullName || requester.name || 'Unknown User'}</span>
+                        <span class="user-email">${requester.email || 'N/A'}</span>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <div class="user-cell">
+                    <img src="${provider.profilePicture || provider.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(provider.fullName || provider.name || 'User')}" 
+                         class="user-avatar" 
+                         alt="${provider.fullName || provider.name || 'User'}" 
+                         onerror="this.src='https://ui-avatars.com/api/?name=User'">
+                    <div class="user-info">
+                        <span class="user-name">${provider.fullName || provider.name || 'Unknown User'}</span>
+                        <span class="user-email">${provider.email || 'N/A'}</span>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-weight: 500; color: var(--primary);">📚 ${exchange.requested_skill || exchange.skillWanted || 'N/A'}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-weight: 500; color: var(--success);">🎯 ${exchange.offered_skill || exchange.skillOffered || 'N/A'}</span>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <span class="status-badge status-${statusClass}">${statusDisplay}</span>
+            </td>
+            <td>
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <span>${dateDisplay}</span>
+                    ${createdDate ? '<span style="font-size: 11px; color: var(--text-secondary);">' + new Date(createdDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) + '</span>' : ''}
+                </div>
+            </td>
             <td>
                 <div class="action-buttons">
-                    <button class="btn-action btn-edit" onclick="viewExchange('${exchange._id}')" title="View Details">👁️</button>
-                    <button class="btn-action btn-delete" onclick="deleteExchange('${exchange._id}')" title="Delete">🗑️</button>
+                    <button class="btn-action btn-view" onclick="viewExchangeDetails('${exchange._id}')" title="View Details">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn-action btn-delete" onclick="confirmDeleteExchange('${exchange._id}', '${(requester.fullName || requester.name || 'User').replace(/'/g, "\\'")}', '${(provider.fullName || provider.name || 'User').replace(/'/g, "\\'")}' )" title="Delete Exchange">
+                        <i class="fas fa-trash"></i>
+                    </button>
                 </div>
             </td>
         </tr>
-    `).join('');
+        `;
+    }).join('');
     
     tableBody.innerHTML = html;
 }
@@ -721,38 +1055,133 @@ function filterExchanges() {
     loadExchanges(filterValue);
 }
 
-async function viewExchange(exchangeId) {
-    showSuccess(`Viewing exchange: ${exchangeId.slice(-6)}`);
+async function viewExchangeDetails(exchangeId) {
+    try {
+        const response = await fetch(`/api/admin/exchanges/${exchangeId}`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.exchange) {
+            const exchange = data.exchange;
+            const requester = exchange.requester_id || {};
+            const provider = exchange.provider_id || {};
+            
+            // Create modal content
+            const modalContent = `
+                <div class="exchange-details">
+                    <h3 style="margin-bottom: 20px; color: var(--primary);">Exchange Details</h3>
+                    
+                    <div class="detail-section">
+                        <h4>Status</h4>
+                        <span class="status-badge status-${exchange.status}">${exchange.status}</span>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h4>Requester</h4>
+                        <div class="user-cell">
+                            <img src="${requester.profilePicture || requester.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(requester.fullName || 'User')}" 
+                                 class="user-avatar" alt="${requester.fullName || 'User'}">
+                            <div class="user-info">
+                                <span class="user-name">${requester.fullName || requester.name || 'Unknown'}</span>
+                                <span class="user-email">${requester.email || 'N/A'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h4>Provider</h4>
+                        <div class="user-cell">
+                            <img src="${provider.profilePicture || provider.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(provider.fullName || 'User')}" 
+                                 class="user-avatar" alt="${provider.fullName || 'User'}">
+                            <div class="user-info">
+                                <span class="user-name">${provider.fullName || provider.name || 'Unknown'}</span>
+                                <span class="user-email">${provider.email || 'N/A'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h4>Skills Exchange</h4>
+                        <p><strong>Requested Skill:</strong> ${exchange.requested_skill || exchange.skillWanted || 'N/A'}</p>
+                        <p><strong>Offered Skill:</strong> ${exchange.offered_skill || exchange.skillOffered || 'N/A'}</p>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h4>Dates</h4>
+                        <p><strong>Created:</strong> ${exchange.created_date || exchange.createdAt ? new Date(exchange.created_date || exchange.createdAt).toLocaleString() : 'N/A'}</p>
+                        ${exchange.completed_date ? `<p><strong>Completed:</strong> ${new Date(exchange.completed_date).toLocaleString()}</p>` : ''}
+                    </div>
+                    
+                    ${exchange.rating ? `
+                        <div class="detail-section">
+                            <h4>Rating</h4>
+                            <p>${'⭐'.repeat(exchange.rating)} (${exchange.rating}/5)</p>
+                            ${exchange.review ? `<p><em>"${exchange.review}"</em></p>` : ''}
+                        </div>
+                    ` : ''}
+                    
+                    <div class="modal-actions" style="margin-top: 20px;">
+                        <button class="btn btn-secondary" onclick="closeModal('editUserModal')">Close</button>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('editUserForm').innerHTML = modalContent;
+            openModal('editUserModal');
+        } else {
+            showError('Exchange not found');
+        }
+    } catch (error) {
+        console.error('Error loading exchange details:', error);
+        showError('Error loading exchange details');
+    }
 }
 
-function deleteExchange(exchangeId) {
+function confirmDeleteExchange(exchangeId, requesterName, providerName) {
     const confirmMsg = document.getElementById('confirmMessage');
     const confirmBtn = document.getElementById('confirmBtn');
     
-    confirmMsg.textContent = 'Are you sure you want to delete this exchange?';
-    confirmBtn.onclick = () => confirmDeleteExchange(exchangeId);
+    confirmMsg.innerHTML = `
+        <p>Are you sure you want to delete this exchange?</p>
+        <p style="margin-top: 10px;"><strong>Requester:</strong> ${requesterName}</p>
+        <p><strong>Provider:</strong> ${providerName}</p>
+        <p style="color: var(--danger); margin-top: 10px; font-weight: 500;">This action cannot be undone!</p>
+    `;
+    confirmBtn.onclick = () => deleteExchange(exchangeId);
     
     openModal('confirmModal');
 }
 
-async function confirmDeleteExchange(exchangeId) {
+async function deleteExchange(exchangeId) {
     try {
         const response = await fetch(`/api/admin/exchanges/${exchangeId}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: getAuthHeaders()
         });
         
         const data = await response.json();
         
         if (data.success) {
             closeModal('confirmModal');
-            loadExchanges();
-            showSuccess('Exchange deleted successfully');
+            showSuccess('Exchange deleted successfully! 🗑️');
+            
+            // Reload exchanges with current filter
+            const filterValue = document.getElementById('exchangeFilter')?.value || 'all';
+            loadExchanges(filterValue);
         } else {
             showError(data.message || 'Failed to delete exchange');
         }
     } catch (error) {
         console.error('Error deleting exchange:', error);
         showError('Error deleting exchange');
+    }
+}
     }
 }
 

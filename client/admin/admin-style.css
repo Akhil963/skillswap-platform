@@ -783,15 +783,30 @@ button, .btn, .nav-item {
     font-size: 12px;
     cursor: pointer;
     transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
 }
 
-.btn-edit {
+.btn-view {
     background: var(--info);
     color: white;
 }
 
-.btn-edit:hover {
+.btn-view:hover {
     background: #2563eb;
+    transform: translateY(-2px);
+}
+
+.btn-edit {
+    background: var(--warning);
+    color: white;
+}
+
+.btn-edit:hover {
+    background: #d97706;
+    transform: translateY(-2px);
 }
 
 .btn-delete {
@@ -801,6 +816,7 @@ button, .btn, .nav-item {
 
 .btn-delete:hover {
     background: #dc2626;
+    transform: translateY(-2px);
 }
 
 .loading {
@@ -1836,5 +1852,136 @@ button, .btn, .nav-item {
     #importStatus {
         padding: 12px;
         font-size: 13px;
+    }
+}
+
+/* ===== USER DETAILS VIEW ===== */
+.user-details-view {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.detail-section {
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.detail-section:last-child {
+    border-bottom: none;
+}
+
+.detail-section h3 {
+    font-size: 16px;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.detail-section p {
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin: 8px 0;
+}
+
+.skills-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.skill-tag {
+    display: inline-block;
+    padding: 6px 12px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-radius: 16px;
+    font-size: 13px;
+    border: 1px solid var(--border-color);
+}
+
+/* ===== STATUS BADGES ===== */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status-active {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--success);
+    border: 1px solid var(--success);
+}
+
+.status-inactive {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+}
+
+/* ===== ENHANCED TABLE STYLES ===== */
+.data-table th {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+}
+
+.data-table th:hover {
+    background: var(--surface-hover);
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* ===== PAGE ACTIONS ENHANCEMENT ===== */
+.page-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.page-actions .search-input {
+    min-width: 250px;
+}
+
+.page-actions .filter-select {
+    min-width: 150px;
+}
+
+@media (max-width: 768px) {
+    .page-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .page-actions .search-input,
+    .page-actions .filter-select {
+        width: 100%;
+        min-width: auto;
+    }
+    
+    .user-details-view {
+        max-height: 60vh;
+    }
+    
+    .skills-container {
+        gap: 6px;
+    }
+    
+    .skill-tag {
+        font-size: 12px;
+        padding: 4px 10px;
     }
 }
