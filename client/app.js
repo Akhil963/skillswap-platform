@@ -2511,7 +2511,52 @@ function initializeContactForm() {
 document.addEventListener('DOMContentLoaded', () => {
   initializeApp();
   initializeContactForm();
+  
+  // Listen for user data updates from admin panel
+  setInterval(() => {
+    const lastUpdate = localStorage.getItem('userDataUpdated');
+    if (lastUpdate && AppState.currentUser) {
+      const updateTime = parseInt(lastUpdate);
+      // If update was within last 5 seconds, refresh user data
+      if (Date.now() - updateTime < 5000) {
+        refreshUserProfile();
+        localStorage.removeItem('userDataUpdated');
+      }
+    }
+  }, 1000);
 });
+
+// Refresh user profile data
+async function refreshUserProfile() {
+  try {
+    const response = await apiRequest('/users/me');
+    if (response.success && response.user) {
+      AppState.currentUser = response.user;
+      updateUserDisplay();
+    }
+  } catch (error) {
+    console.error('Error refreshing user profile:', error);
+  }
+}
+
+// Update user display in UI
+function updateUserDisplay() {
+  if (!AppState.currentUser) return;
+  
+  // Update profile picture
+  const profilePics = document.querySelectorAll('.user-avatar, .profile-avatar, img[alt*="Profile"]');
+  profilePics.forEach(img => {
+    if (AppState.currentUser.profilePicture) {
+      img.src = AppState.currentUser.profilePicture;
+    }
+  });
+  
+  // Update user name
+  const nameElements = document.querySelectorAll('.user-name, .profile-name');
+  nameElements.forEach(el => {
+    el.textContent = AppState.currentUser.fullName || 'User';
+  });
+}
 
 // Make functions global for onclick handlers
 window.navigateToPage = navigateToPage;

@@ -791,7 +791,9 @@ async function viewUserDetails(userId) {
 
 async function editUser(userId) {
     try {
-        const response = await fetch(`/api/admin/users/${userId}`);
+        const response = await fetch(`/api/admin/users/${userId}`, {
+            headers: getAuthHeaders()
+        });
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
@@ -806,6 +808,21 @@ async function editUser(userId) {
             const modalBody = document.getElementById('editUserForm');
             modalBody.innerHTML = `
                 <input type="hidden" id="editUserId" value="${user._id}">
+                
+                <div class="setting-item" style="text-align: center; margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 10px;">Profile Picture</label>
+                    <div style="position: relative; display: inline-block;">
+                        <img id="profilePicPreview" src="${user.profilePicture || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.fullName || 'User')}" 
+                             style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary);" 
+                             alt="Profile Picture">
+                        <label for="profilePicInput" style="position: absolute; bottom: 0; right: 0; background: var(--primary); color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+                            <i class="fas fa-camera"></i>
+                        </label>
+                        <input type="file" id="profilePicInput" accept="image/*" style="display: none;" onchange="handleProfilePicChange(event)">
+                    </div>
+                    <p style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">Click camera icon to upload new picture</p>
+                </div>
+                
                 <div class="setting-item">
                     <label>Full Name</label>
                     <input type="text" class="form-control" id="editUserName" value="${user.fullName || ''}" required>
@@ -847,10 +864,18 @@ async function saveUser() {
         bio: document.getElementById('editUserBio').value
     };
     
+    // Add profile picture if uploaded
+    if (uploadedProfilePic) {
+        userData.profilePicture = uploadedProfilePic;
+    }
+    
     try {
         const response = await fetch(`/api/admin/users/${userId}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                ...getAuthHeaders(),
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify(userData)
         });
         
@@ -858,14 +883,29 @@ async function saveUser() {
         
         if (data.success) {
             closeModal('editUserModal');
-            loadUsers();
-            showSuccess('User updated successfully');
+            
+            // Update user in allUsers array
+            const userIndex = allUsers.findIndex(u => u._id === userId);
+            if (userIndex !== -1) {
+                allUsers[userIndex] = { ...allUsers[userIndex], ...userData };
+            }
+            
+            // Re-display users with updated data
+            displayUsers(allUsers);
+            
+            showSuccess('✅ User updated successfully!');
+            
+            // Clear uploaded picture
+            uploadedProfilePic = null;
+            
+            // Update main app cache if user is logged in
+            localStorage.setItem('userDataUpdated', Date.now());
         } else {
             showError(data.message || 'Failed to update user');
         }
     } catch (error) {
         console.error('Error updating user:', error);
-        showError('Error updating user');
+        showError('Error updating user: ' + error.message);
     }
 }
 
@@ -907,12 +947,21 @@ async function confirmDeleteUser(userId, userName) {
         
         if (data.success) {
             closeModal('confirmModal');
+            
+            // Optimized: Remove user from allUsers array immediately (no reload needed)
+            allUsers = allUsers.filter(user => user._id !== userId);
+            
+            // Re-display current users without API call
+            displayUsers(allUsers);
+            
             showSuccess(`✅ User "${userName}" deleted successfully!`);
             
-            // Reload users with current filters
-            const searchValue = document.getElementById('userSearch')?.value || '';
-            const filterValue = document.getElementById('userFilter')?.value || 'all';
-            loadUsers(searchValue, filterValue);
+            // Update stats count
+            updateStatsCount();
+            
+            // Reset button for next use
+            confirmBtn.innerHTML = originalText;
+            confirmBtn.disabled = false;
         } else {
             showError(data.message || 'Failed to delete user');
             confirmBtn.innerHTML = originalText;
@@ -927,6 +976,45 @@ async function confirmDeleteUser(userId, userName) {
         confirmBtn.innerHTML = 'Confirm';
         confirmBtn.disabled = false;
     }
+}
+
+// Update stats count after user deletion
+function updateStatsCount() {
+    const userCount = document.querySelector('.stat-card h3');
+    if (userCount && allUsers) {
+        userCount.textContent = allUsers.length;
+    }
+}
+
+// Handle profile picture change
+let uploadedProfilePic = null;
+
+function handleProfilePicChange(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+        showError('Please select a valid image file');
+        return;
+    }
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        showError('Image size must be less than 5MB');
+        return;
+    }
+    
+    // Preview the image
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const preview = document.getElementById('profilePicPreview');
+        if (preview) {
+            preview.src = e.target.result;
+            uploadedProfilePic = e.target.result; // Store base64 for upload
+        }
+    };
+    reader.readAsDataURL(file);
 }
 
 // ===== EXCHANGES MANAGEMENT =====

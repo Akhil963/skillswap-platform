@@ -53,10 +53,10 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting - Increased limits for better UX
+// Rate limiting - Increased limits for better UX and high traffic handling
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 500, // Increased from 100 to 500 requests per window
+  max: 1000, // Increased from 500 to 1000 requests per window for high traffic
   message: JSON.stringify({
     success: false,
     message: 'Too many requests from this IP, please try again later.'
@@ -64,7 +64,14 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: false, // Count all requests
-  skipFailedRequests: false
+  skipFailedRequests: false,
+  handler: (req, res) => {
+    res.status(429).json({
+      success: false,
+      message: 'Too many requests. Please wait a moment and try again.',
+      retryAfter: 60
+    });
+  }
 });
 app.use('/api/', limiter);
 
@@ -136,13 +143,55 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
-// Error handling
+// Error handling middleware with better error responses
 app.use((err, req, res, next) => {
   console.error('Error:', err);
+  
+  // Handle specific error types
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation Error',
+      errors: Object.values(err.errors).map(e => e.message)
+    });
+  }
+  
+  if (err.name === 'CastError') {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid ID format'
+    });
+  }
+  
+  if (err.code === 11000) {
+    return res.status(409).json({
+      success: false,
+      message: 'Duplicate entry found'
+    });
+  }
+  
+  // MongoDB connection errors
+  if (err.name === 'MongoError' || err.name === 'MongoServerError') {
+    return res.status(503).json({
+      success: false,
+      message: 'Database temporarily unavailable. Please try again in a moment.',
+      retryAfter: 30
+    });
+  }
+  
+  // Generic error response
   res.status(err.statusCode || 500).json({
     success: false,
-    message: err.message || 'Server Error',
+    message: err.message || 'Server Error. Please try again later.',
     error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+});
+
+// 404 handler for unknown routes
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'API endpoint not found'
   });
 });
 
@@ -151,11 +200,34 @@ const handler = async (event, context) => {
   // Prevent function timeout from waiting for DB connection pool
   context.callbackWaitsForEmptyEventLoop = false;
   
-  // Connect to database
-  await initDB();
-  
-  // Handle the request
-  return serverless(app)(event, context);
+  try {
+    // Connect to database with timeout
+    await Promise.race([
+      initDB(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database connection timeout')), 10000)
+      )
+    ]);
+    
+    // Handle the request
+    return serverless(app)(event, context);
+  } catch (error) {
+    console.error('Serverless function error:', error);
+    
+    // Return error response
+    return {
+      statusCode: 503,
+      headers: {
+        'Content-Type': 'application/json',
+        'Retry-After': '30'
+      },
+      body: JSON.stringify({
+        success: false,
+        message: 'Service temporarily unavailable. Please try again in a moment.',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      })
+    };
+  }
 };
 
 module.exports.handler = handler;

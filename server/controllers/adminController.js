@@ -153,16 +153,23 @@ exports.getUserById = async (req, res) => {
 // Update user
 exports.updateUser = async (req, res) => {
     try {
-        const { fullName, email, location, bio } = req.body;
+        const { fullName, email, location, bio, profilePicture } = req.body;
+        
+        const updateData = {
+            fullName,
+            email,
+            location,
+            bio
+        };
+        
+        // Add profile picture if provided
+        if (profilePicture) {
+            updateData.profilePicture = profilePicture;
+        }
         
         const user = await User.findByIdAndUpdate(
             req.params.id,
-            {
-                fullName,
-                email,
-                location,
-                bio
-            },
+            updateData,
             { new: true, runValidators: true }
         ).select('-password');
         
