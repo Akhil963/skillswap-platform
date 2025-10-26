@@ -1160,62 +1160,165 @@ async function viewExchangeDetails(exchangeId) {
             const requester = exchange.requester_id || {};
             const provider = exchange.provider_id || {};
             
+            // Get proper names and emails
+            const requesterName = requester.fullName || requester.name || 'Unknown User';
+            const requesterEmail = requester.email || 'N/A';
+            const requesterAvatar = requester.profilePicture || requester.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(requesterName)}&background=random`;
+            
+            const providerName = provider.fullName || provider.name || 'Unknown User';
+            const providerEmail = provider.email || 'N/A';
+            const providerAvatar = provider.profilePicture || provider.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(providerName)}&background=random`;
+            
+            // Format dates properly
+            const createdDate = exchange.created_date || exchange.createdAt;
+            const completedDate = exchange.completed_date;
+            const formattedCreated = createdDate 
+                ? new Date(createdDate).toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                  })
+                : 'N/A';
+            
+            const formattedCompleted = completedDate 
+                ? new Date(completedDate).toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                  })
+                : null;
+            
+            // Status badge styling
+            const statusColors = {
+                'pending': 'background: #fef3c7; color: #92400e; border: 1px solid #fbbf24;',
+                'accepted': 'background: #dbeafe; color: #1e40af; border: 1px solid #3b82f6;',
+                'in_progress': 'background: #e0e7ff; color: #4338ca; border: 1px solid #6366f1;',
+                'completed': 'background: #d1fae5; color: #065f46; border: 1px solid #10b981;',
+                'cancelled': 'background: #fee2e2; color: #991b1b; border: 1px solid #ef4444;'
+            };
+            const statusStyle = statusColors[exchange.status] || statusColors.pending;
+            
             // Create modal content
             const modalContent = `
-                <div class="exchange-details">
-                    <h3 style="margin-bottom: 20px; color: var(--primary);">Exchange Details</h3>
+                <div class="exchange-details-modal">
+                    <h3 style="margin-bottom: 24px; color: var(--primary); font-size: 24px; border-bottom: 2px solid var(--primary); padding-bottom: 12px;">
+                        📊 Exchange Details
+                    </h3>
                     
-                    <div class="detail-section">
-                        <h4>Status</h4>
-                        <span class="status-badge status-${exchange.status}">${exchange.status}</span>
+                    <div class="detail-section" style="background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                        <h4 style="margin-bottom: 12px; color: #64748b; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Status</h4>
+                        <span class="status-badge" style="${statusStyle} padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 14px; display: inline-block;">
+                            ${exchange.status.toUpperCase().replace('_', ' ')}
+                        </span>
                     </div>
                     
-                    <div class="detail-section">
-                        <h4>Requester</h4>
-                        <div class="user-cell">
-                            <img src="${requester.profilePicture || requester.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(requester.fullName || 'User')}" 
-                                 class="user-avatar" alt="${requester.fullName || 'User'}">
-                            <div class="user-info">
-                                <span class="user-name">${requester.fullName || requester.name || 'Unknown'}</span>
-                                <span class="user-email">${requester.email || 'N/A'}</span>
+                    <div class="detail-section" style="background: #fef9e7; padding: 20px; border-radius: 12px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
+                        <h4 style="margin-bottom: 16px; color: #92400e; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 20px;">👤</span> Requester
+                        </h4>
+                        <div class="user-card" style="display: flex; align-items: center; gap: 16px; background: white; padding: 16px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                            <img src="${requesterAvatar}" 
+                                 class="user-avatar" 
+                                 alt="${requesterName}"
+                                 style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 3px solid #f59e0b;">
+                            <div class="user-info" style="flex: 1;">
+                                <div class="user-name" style="font-size: 18px; font-weight: 600; color: #1e293b; margin-bottom: 4px;">
+                                    ${requesterName}
+                                </div>
+                                <div class="user-email" style="font-size: 14px; color: #64748b; display: flex; align-items: center; gap: 6px;">
+                                    <span style="font-size: 16px;">📧</span> ${requesterEmail}
+                                </div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="detail-section">
-                        <h4>Provider</h4>
-                        <div class="user-cell">
-                            <img src="${provider.profilePicture || provider.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(provider.fullName || 'User')}" 
-                                 class="user-avatar" alt="${provider.fullName || 'User'}">
-                            <div class="user-info">
-                                <span class="user-name">${provider.fullName || provider.name || 'Unknown'}</span>
-                                <span class="user-email">${provider.email || 'N/A'}</span>
+                    <div class="detail-section" style="background: #eff6ff; padding: 20px; border-radius: 12px; margin-bottom: 20px; border-left: 4px solid #3b82f6;">
+                        <h4 style="margin-bottom: 16px; color: #1e40af; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 20px;">👥</span> Provider
+                        </h4>
+                        <div class="user-card" style="display: flex; align-items: center; gap: 16px; background: white; padding: 16px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                            <img src="${providerAvatar}" 
+                                 class="user-avatar" 
+                                 alt="${providerName}"
+                                 style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 3px solid #3b82f6;">
+                            <div class="user-info" style="flex: 1;">
+                                <div class="user-name" style="font-size: 18px; font-weight: 600; color: #1e293b; margin-bottom: 4px;">
+                                    ${providerName}
+                                </div>
+                                <div class="user-email" style="font-size: 14px; color: #64748b; display: flex; align-items: center; gap: 6px;">
+                                    <span style="font-size: 16px;">📧</span> ${providerEmail}
+                                </div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="detail-section">
-                        <h4>Skills Exchange</h4>
-                        <p><strong>Requested Skill:</strong> ${exchange.requested_skill || exchange.skillWanted || 'N/A'}</p>
-                        <p><strong>Offered Skill:</strong> ${exchange.offered_skill || exchange.skillOffered || 'N/A'}</p>
+                    <div class="detail-section" style="background: #f0fdf4; padding: 20px; border-radius: 12px; margin-bottom: 20px; border-left: 4px solid #10b981;">
+                        <h4 style="margin-bottom: 16px; color: #065f46; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 20px;">🔄</span> Skills Exchange
+                        </h4>
+                        <div style="background: white; padding: 16px; border-radius: 8px;">
+                            <p style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+                                <span style="font-weight: 600; color: #059669; min-width: 140px;">📚 Requested Skill:</span>
+                                <span style="background: #d1fae5; color: #065f46; padding: 6px 12px; border-radius: 6px; font-weight: 500;">
+                                    ${exchange.requested_skill || exchange.skillWanted || 'N/A'}
+                                </span>
+                            </p>
+                            <p style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-weight: 600; color: #0891b2; min-width: 140px;">🎯 Offered Skill:</span>
+                                <span style="background: #cffafe; color: #155e75; padding: 6px 12px; border-radius: 6px; font-weight: 500;">
+                                    ${exchange.offered_skill || exchange.skillOffered || 'N/A'}
+                                </span>
+                            </p>
+                        </div>
                     </div>
                     
-                    <div class="detail-section">
-                        <h4>Dates</h4>
-                        <p><strong>Created:</strong> ${exchange.created_date || exchange.createdAt ? new Date(exchange.created_date || exchange.createdAt).toLocaleString() : 'N/A'}</p>
-                        ${exchange.completed_date ? `<p><strong>Completed:</strong> ${new Date(exchange.completed_date).toLocaleString()}</p>` : ''}
+                    <div class="detail-section" style="background: #fdf4ff; padding: 20px; border-radius: 12px; margin-bottom: 20px; border-left: 4px solid #a855f7;">
+                        <h4 style="margin-bottom: 16px; color: #7e22ce; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 20px;">📅</span> Timeline
+                        </h4>
+                        <div style="background: white; padding: 16px; border-radius: 8px;">
+                            <p style="margin-bottom: 12px; display: flex; align-items: start; gap: 8px;">
+                                <span style="font-weight: 600; color: #7e22ce; min-width: 100px;">Created:</span>
+                                <span style="color: #64748b; font-family: 'Courier New', monospace;">${formattedCreated}</span>
+                            </p>
+                            ${formattedCompleted ? `
+                                <p style="display: flex; align-items: start; gap: 8px;">
+                                    <span style="font-weight: 600; color: #059669; min-width: 100px;">Completed:</span>
+                                    <span style="color: #64748b; font-family: 'Courier New', monospace;">${formattedCompleted}</span>
+                                </p>
+                            ` : ''}
+                        </div>
                     </div>
                     
                     ${exchange.rating ? `
-                        <div class="detail-section">
-                            <h4>Rating</h4>
-                            <p>${'⭐'.repeat(exchange.rating)} (${exchange.rating}/5)</p>
-                            ${exchange.review ? `<p><em>"${exchange.review}"</em></p>` : ''}
+                        <div class="detail-section" style="background: #fff7ed; padding: 20px; border-radius: 12px; margin-bottom: 20px; border-left: 4px solid #ea580c;">
+                            <h4 style="margin-bottom: 16px; color: #9a3412; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 20px;">⭐</span> Rating & Review
+                            </h4>
+                            <div style="background: white; padding: 16px; border-radius: 8px;">
+                                <p style="margin-bottom: 8px; font-size: 24px;">
+                                    ${'⭐'.repeat(exchange.rating)}${'☆'.repeat(5 - exchange.rating)}
+                                </p>
+                                <p style="color: #64748b; margin-bottom: 8px;">Rating: <strong>${exchange.rating}/5</strong></p>
+                                ${exchange.review ? `
+                                    <div style="background: #fef3c7; padding: 12px; border-radius: 6px; border-left: 3px solid #f59e0b; margin-top: 12px;">
+                                        <p style="color: #92400e; font-style: italic; margin: 0;">"${exchange.review}"</p>
+                                    </div>
+                                ` : ''}
+                            </div>
                         </div>
                     ` : ''}
                     
-                    <div class="modal-actions" style="margin-top: 20px;">
-                        <button class="btn btn-secondary" onclick="closeModal('editUserModal')">Close</button>
+                    <div class="modal-actions" style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px;">
+                        <button class="btn btn-secondary" onclick="closeModal('editUserModal')" style="padding: 10px 24px; font-size: 14px;">
+                            ✖️ Close
+                        </button>
                     </div>
                 </div>
             `;
@@ -1227,7 +1330,7 @@ async function viewExchangeDetails(exchangeId) {
         }
     } catch (error) {
         console.error('Error loading exchange details:', error);
-        showError('Error loading exchange details');
+        showError('Error loading exchange details: ' + error.message);
     }
 }
 
