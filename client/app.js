@@ -2244,7 +2244,7 @@ async function showEditProfileModal() {
           </p>
         </div>
         
-        <div style="margin-bottom: 16px;">
+        <div id="urlSection" style="margin-bottom: 16px;">
           <label class="form-label" style="font-size: 14px;">Or enter image URL:</label>
           <input type="url" class="form-control" id="editAvatar" 
                  value="${currentAvatar}"
@@ -2252,7 +2252,7 @@ async function showEditProfileModal() {
                  oninput="updateAvatarPreview(this.value)">
         </div>
         
-        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;">
+        <div id="presetsSection" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;">
           <button type="button" class="btn btn--outline btn--sm" onclick="setAvatarPreset('https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face')">👤 Default 1</button>
           <button type="button" class="btn btn--outline btn--sm" onclick="setAvatarPreset('https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop&crop=face')">👤 Default 2</button>
           <button type="button" class="btn btn--outline btn--sm" onclick="setAvatarPreset('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face')">👤 Default 3</button>
@@ -2310,7 +2310,7 @@ function setAvatarPreset(url) {
 // Handle profile picture upload from device
 let uploadedProfilePicture = null;
 
-function handleProfilePicUpload(event) {
+async function handleProfilePicUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
   
@@ -2327,19 +2327,57 @@ function handleProfilePicUpload(event) {
   }
   
   // Show loading notification
-  showNotification('📸 Uploading image...', 'info');
+  showNotification('📸 Uploading and saving image...', 'info');
   
   // Read and preview the image
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     const preview = document.getElementById('previewAvatar');
-    const avatarInput = document.getElementById('editAvatar');
+    const urlSection = document.getElementById('urlSection');
+    const presetsSection = document.getElementById('presetsSection');
     
-    if (preview && avatarInput) {
+    if (preview) {
       preview.src = e.target.result;
-      avatarInput.value = e.target.result; // Store base64 for upload
-      uploadedProfilePicture = e.target.result; // Store separately
-      showNotification('✅ Image loaded! Click Save to update your profile', 'success');
+      uploadedProfilePicture = e.target.result;
+      
+      // Hide URL input and presets when picture is uploaded
+      if (urlSection) urlSection.style.display = 'none';
+      if (presetsSection) presetsSection.style.display = 'none';
+      
+      // Auto-save to database in real-time
+      try {
+        const updateData = {
+          name: AppState.currentUser.name,
+          bio: AppState.currentUser.bio || '',
+          location: AppState.currentUser.location || '',
+          profilePicture: e.target.result,
+          avatar: e.target.result,
+          skills_offered: AppState.currentUser.skills_offered,
+          skills_wanted: AppState.currentUser.skills_wanted
+        };
+        
+        const data = await apiRequest('/auth/update', {
+          method: 'PUT',
+          body: JSON.stringify(updateData)
+        });
+        
+        AppState.currentUser = data.user;
+        uploadedProfilePicture = null; // Clear after save
+        
+        showNotification('✅ Profile picture updated successfully!', 'success');
+        
+        // Update all profile pictures in the UI
+        updateAllProfilePictures(e.target.result);
+        
+        // Refresh current page
+        if (AppState.currentPage === 'profile') {
+          renderProfile();
+        } else if (AppState.currentPage === 'dashboard') {
+          renderDashboard();
+        }
+      } catch (error) {
+        showNotification('Error saving profile picture: ' + error.message, 'error');
+      }
     }
   };
   
@@ -2348,6 +2386,14 @@ function handleProfilePicUpload(event) {
   };
   
   reader.readAsDataURL(file);
+}
+
+// Update all profile pictures in the UI
+function updateAllProfilePictures(imageUrl) {
+  const profileImages = document.querySelectorAll('.user-avatar, .profile-avatar, img[alt*="avatar"], img[alt*="profile" i]');
+  profileImages.forEach(img => {
+    img.src = imageUrl;
+  });
 }
 
 async function handleEditProfile(event) {
@@ -2635,6 +2681,7 @@ window.handleEditProfile = handleEditProfile;
 window.updateAvatarPreview = updateAvatarPreview;
 window.setAvatarPreset = setAvatarPreset;
 window.handleProfilePicUpload = handleProfilePicUpload;
+window.updateAllProfilePictures = updateAllProfilePictures;
 window.closeModal = closeModal;
 window.hideProfileCompletion = hideProfileCompletion;
 window.showForgotPassword = showForgotPassword;
