@@ -157,7 +157,6 @@ async function apiRequest(endpoint, options = {}) {
   AppState.pendingRequests[cacheKey] = requestPromise;
 
   return requestPromise;
-  }
 }
 
 // Clear cache function
