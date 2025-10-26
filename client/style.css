@@ -2777,6 +2777,18 @@ a:hover {
     flex-direction: column;
     text-align: center;
     gap: var(--space-16);
+    align-items: center;
+    justify-content: center;
+  }
+
+  .profile-avatar {
+    margin: 0 auto;
+    display: block;
+  }
+
+  .profile-info {
+    width: 100%;
+    text-align: center;
   }
 
   .profile-stats {
@@ -4232,24 +4244,38 @@ html {
   .profile-header {
     padding: var(--space-20);
     gap: var(--space-16);
+    align-items: center;
+    justify-content: center;
   }
 
   .profile-avatar {
     width: 100px;
     height: 100px;
+    margin: 0 auto;
+    display: block;
+  }
+
+  .profile-info {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
 
   .profile-name {
     font-size: var(--font-size-xl);
+    text-align: center;
   }
 
   .profile-bio {
     font-size: var(--font-size-sm);
+    text-align: center;
   }
 
   .profile-stats {
     padding: var(--space-12);
     gap: var(--space-12);
+    justify-content: center;
   }
 
   .profile-stat {
@@ -4263,6 +4289,7 @@ html {
   .profile-actions {
     flex-direction: column;
     gap: var(--space-8);
+    width: 100%;
   }
 
   .profile-actions button {
@@ -4283,21 +4310,36 @@ html {
   .profile-header {
     padding: var(--space-16);
     gap: var(--space-12);
+    align-items: center;
   }
 
   .profile-avatar {
     width: 80px;
     height: 80px;
+    margin: 0 auto;
+    display: block;
+  }
+
+  .profile-info {
+    width: 100%;
+    text-align: center;
   }
 
   .profile-name {
     font-size: var(--font-size-lg);
+    text-align: center;
+  }
+
+  .profile-bio {
+    font-size: var(--font-size-sm);
+    text-align: center;
   }
 
   .profile-stats {
     padding: var(--space-8);
     gap: var(--space-8);
     flex-wrap: wrap;
+    justify-content: center;
   }
 
   .profile-stat {
@@ -4319,6 +4361,7 @@ html {
 
   .profile-section h3 {
     font-size: var(--font-size-base);
+    text-align: center;
   }
 }
 
@@ -4331,19 +4374,30 @@ html {
   .dashboard-profile-header {
     padding: var(--space-16);
     gap: var(--space-12);
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
   }
 
   .user-avatar {
     width: 60px;
     height: 60px;
+    margin: 0 auto;
+  }
+
+  .user-info {
+    width: 100%;
+    text-align: center;
   }
 
   .user-name {
     font-size: var(--font-size-base);
+    text-align: center;
   }
 
   .user-location {
     font-size: var(--font-size-xs);
+    text-align: center;
   }
 
   .profile-completion-widget {
@@ -4521,6 +4575,55 @@ html {
   .profile-avatar {
     image-rendering: -webkit-optimize-contrast;
     image-rendering: crisp-edges;
+  }
+}
+
+/* Additional Profile Mobile Enhancements */
+@media (max-width: 768px) {
+  .profile-section .skill-item,
+  .profile-section .exchange-item {
+    margin-bottom: var(--space-12);
+    padding: var(--space-12);
+  }
+
+  .skill-item-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-8);
+  }
+
+  .btn--sm {
+    width: 100%;
+    text-align: center;
+  }
+
+  .profile-section > div[style*="display: flex"] {
+    flex-direction: column !important;
+    gap: var(--space-12) !important;
+  }
+
+  .profile-section button {
+    width: 100%;
+  }
+}
+
+/* Center all profile content on mobile */
+@media (max-width: 640px) {
+  .profile-section {
+    text-align: center;
+  }
+
+  .profile-section h3 {
+    text-align: center;
+    margin-bottom: var(--space-16);
+  }
+
+  .skill-item,
+  .exchange-item {
+    text-align: left;
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 100%;
   }
 }
 
