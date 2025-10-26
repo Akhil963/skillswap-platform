@@ -134,13 +134,22 @@ exports.getMe = async (req, res, next) => {
 // @access  Private
 exports.updateProfile = async (req, res, next) => {
   try {
-    const { name, bio, location, avatar, skills_offered, skills_wanted } = req.body;
+    const { name, bio, location, avatar, profilePicture, skills_offered, skills_wanted } = req.body;
 
     const updateFields = {};
     if (name) updateFields.name = name;
     if (bio) updateFields.bio = bio;
     if (location) updateFields.location = location;
-    if (avatar) updateFields.avatar = avatar;
+    
+    // Handle profile picture (uploaded file takes priority)
+    if (profilePicture) {
+      updateFields.profilePicture = profilePicture;
+      updateFields.avatar = profilePicture; // Also update avatar field for backward compatibility
+    } else if (avatar) {
+      updateFields.avatar = avatar;
+      updateFields.profilePicture = avatar;
+    }
+    
     if (skills_offered) updateFields.skills_offered = skills_offered;
     if (skills_wanted) updateFields.skills_wanted = skills_wanted;
 

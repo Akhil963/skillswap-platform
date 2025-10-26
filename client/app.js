@@ -2224,30 +2224,39 @@ async function showEditProfileModal() {
   
   modalTitle.textContent = 'Edit Profile';
   
-  const currentAvatar = AppState.currentUser.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face';
+  const currentAvatar = AppState.currentUser.profilePicture || AppState.currentUser.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face';
   
   modalContent.innerHTML = `
     <form id="editProfileForm" onsubmit="handleEditProfile(event)">
       <div class="form-group">
         <label class="form-label">Profile Picture</label>
-        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 12px;">
-          <img src="${currentAvatar}" id="previewAvatar" 
-               style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid var(--color-primary);">
-          <div style="flex: 1;">
-            <input type="url" class="form-control" id="editAvatar" 
-                   value="${currentAvatar}"
-                   placeholder="Enter image URL (e.g., https://example.com/photo.jpg)"
-                   oninput="updateAvatarPreview(this.value)">
-            <p style="font-size: 12px; color: var(--color-text-secondary); margin-top: 8px;">
-              💡 Tip: Use a square image URL for best results. Try <a href="https://unsplash.com" target="_blank" style="color: var(--color-primary);">Unsplash</a> for free photos!
-            </p>
+        <div style="text-align: center; margin-bottom: 20px;">
+          <div style="position: relative; display: inline-block;">
+            <img src="${currentAvatar}" id="previewAvatar" 
+                 style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid var(--color-primary); box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+            <label for="profilePicUpload" style="position: absolute; bottom: 0; right: 0; background: var(--color-primary); color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2); border: 3px solid white;">
+              <i class="fas fa-camera" style="font-size: 16px;"></i>
+            </label>
+            <input type="file" id="profilePicUpload" accept="image/*" style="display: none;" onchange="handleProfilePicUpload(event)">
           </div>
+          <p style="font-size: 13px; color: var(--color-text-secondary); margin-top: 12px;">
+            � Click camera icon to upload from device
+          </p>
         </div>
+        
+        <div style="margin-bottom: 16px;">
+          <label class="form-label" style="font-size: 14px;">Or enter image URL:</label>
+          <input type="url" class="form-control" id="editAvatar" 
+                 value="${currentAvatar}"
+                 placeholder="https://example.com/photo.jpg"
+                 oninput="updateAvatarPreview(this.value)">
+        </div>
+        
         <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;">
-          <button type="button" class="btn btn--outline btn--sm" onclick="setAvatarPreset('https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face')">Default 1</button>
-          <button type="button" class="btn btn--outline btn--sm" onclick="setAvatarPreset('https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop&crop=face')">Default 2</button>
-          <button type="button" class="btn btn--outline btn--sm" onclick="setAvatarPreset('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face')">Default 3</button>
-          <button type="button" class="btn btn--outline btn--sm" onclick="setAvatarPreset('https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face')">Default 4</button>
+          <button type="button" class="btn btn--outline btn--sm" onclick="setAvatarPreset('https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face')">👤 Default 1</button>
+          <button type="button" class="btn btn--outline btn--sm" onclick="setAvatarPreset('https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop&crop=face')">👤 Default 2</button>
+          <button type="button" class="btn btn--outline btn--sm" onclick="setAvatarPreset('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face')">👤 Default 3</button>
+          <button type="button" class="btn btn--outline btn--sm" onclick="setAvatarPreset('https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face')">👤 Default 4</button>
         </div>
       </div>
 
@@ -2298,6 +2307,49 @@ function setAvatarPreset(url) {
   }
 }
 
+// Handle profile picture upload from device
+let uploadedProfilePicture = null;
+
+function handleProfilePicUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    showNotification('Please select a valid image file', 'error');
+    return;
+  }
+  
+  // Validate file size (max 5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    showNotification('Image size must be less than 5MB', 'error');
+    return;
+  }
+  
+  // Show loading notification
+  showNotification('📸 Uploading image...', 'info');
+  
+  // Read and preview the image
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const preview = document.getElementById('previewAvatar');
+    const avatarInput = document.getElementById('editAvatar');
+    
+    if (preview && avatarInput) {
+      preview.src = e.target.result;
+      avatarInput.value = e.target.result; // Store base64 for upload
+      uploadedProfilePicture = e.target.result; // Store separately
+      showNotification('✅ Image loaded! Click Save to update your profile', 'success');
+    }
+  };
+  
+  reader.onerror = () => {
+    showNotification('Error reading image file', 'error');
+  };
+  
+  reader.readAsDataURL(file);
+}
+
 async function handleEditProfile(event) {
   event.preventDefault();
   
@@ -2312,19 +2364,32 @@ async function handleEditProfile(event) {
   }
   
   try {
+    const updateData = {
+      name,
+      bio,
+      location,
+      skills_offered: AppState.currentUser.skills_offered,
+      skills_wanted: AppState.currentUser.skills_wanted
+    };
+    
+    // Use uploaded picture if available, otherwise use URL
+    if (uploadedProfilePicture) {
+      updateData.profilePicture = uploadedProfilePicture;
+      updateData.avatar = uploadedProfilePicture;
+    } else if (avatar) {
+      updateData.avatar = avatar;
+      updateData.profilePicture = avatar;
+    }
+    
     const data = await apiRequest('/auth/update', {
       method: 'PUT',
-      body: JSON.stringify({
-        name,
-        bio,
-        location,
-        avatar,
-        skills_offered: AppState.currentUser.skills_offered,
-        skills_wanted: AppState.currentUser.skills_wanted
-      })
+      body: JSON.stringify(updateData)
     });
     
     AppState.currentUser = data.user;
+    
+    // Clear uploaded picture after successful save
+    uploadedProfilePicture = null;
     
     document.getElementById('exchangeModal').classList.remove('show');
     showNotification('✅ Profile updated successfully!', 'success');
@@ -2569,6 +2634,7 @@ window.showEditProfileModal = showEditProfileModal;
 window.handleEditProfile = handleEditProfile;
 window.updateAvatarPreview = updateAvatarPreview;
 window.setAvatarPreset = setAvatarPreset;
+window.handleProfilePicUpload = handleProfilePicUpload;
 window.closeModal = closeModal;
 window.hideProfileCompletion = hideProfileCompletion;
 window.showForgotPassword = showForgotPassword;
