@@ -1,6 +1,7 @@
 {
   "version": 2,
-  "name": "skillswap-platform",
+  "buildCommand": "",
+  "installCommand": "npm install",
   "builds": [
     {
       "src": "server/server.js",
