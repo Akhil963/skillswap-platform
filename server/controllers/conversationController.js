@@ -17,17 +17,34 @@ exports.getConversations = async (req, res, next) => {
       participants: req.user._id,
       isActive: true
     })
-      .populate('participants', 'name avatar')
+      .populate('participants', 'name avatar email')
       .populate('exchange_id', 'requested_skill offered_skill status')
-      .populate('lastMessage.sender', 'name')
-      .sort({ 'lastMessage.timestamp': -1 });
+      .populate('lastMessage.sender', 'name avatar')
+      .sort({ 'lastMessage.timestamp': -1 })
+      .lean();
+
+    // Filter out conversations with missing data
+    const validConversations = conversations.filter(conv => {
+      // Ensure participants are populated
+      if (!conv.participants || conv.participants.length < 2) return false;
+      
+      // Ensure all participants have required fields
+      const allParticipantsValid = conv.participants.every(p => p && p.name && p._id);
+      if (!allParticipantsValid) return false;
+      
+      // Ensure exchange_id is populated
+      if (!conv.exchange_id) return false;
+      
+      return true;
+    });
 
     res.status(200).json({
       success: true,
-      count: conversations.length,
-      conversations
+      count: validConversations.length,
+      conversations: validConversations
     });
   } catch (error) {
+    console.error('Error loading conversations:', error);
     next(error);
   }
 };

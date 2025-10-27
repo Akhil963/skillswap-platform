@@ -465,3 +465,82 @@ exports.deleteExchange = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Get skills learned by user (completed exchanges where user was requester)
+// @route   GET /api/exchanges/learned
+// @access  Private
+exports.getLearnedSkills = async (req, res, next) => {
+  try {
+    // Get all completed exchanges where current user was the requester (learner)
+    const learnedExchanges = await Exchange.find({
+      requester_id: req.user._id,
+      status: 'completed'
+    })
+      .populate('provider_id', 'name email avatar rating total_exchanges')
+      .sort({ completed_date: -1 });
+
+    // Format the learned skills data
+    const learnedSkills = learnedExchanges.map(exchange => ({
+      skill: exchange.requested_skill,
+      teacher: {
+        id: exchange.provider_id._id,
+        name: exchange.provider_id.name,
+        avatar: exchange.provider_id.avatar,
+        rating: exchange.provider_id.rating
+      },
+      completedDate: exchange.completed_date,
+      rating: exchange.rating,
+      review: exchange.review,
+      sessionsCompleted: exchange.sessions_completed,
+      totalHours: exchange.total_hours
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: learnedSkills.length,
+      learnedSkills
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get skills taught by user (completed exchanges where user was provider)
+// @route   GET /api/exchanges/taught
+// @access  Private
+exports.getTaughtSkills = async (req, res, next) => {
+  try {
+    // Get all completed exchanges where current user was the provider (teacher)
+    const taughtExchanges = await Exchange.find({
+      provider_id: req.user._id,
+      status: 'completed'
+    })
+      .populate('requester_id', 'name email avatar rating total_exchanges')
+      .sort({ completed_date: -1 });
+
+    // Format the taught skills data
+    const taughtSkills = taughtExchanges.map(exchange => ({
+      skill: exchange.offered_skill,
+      student: {
+        id: exchange.requester_id._id,
+        name: exchange.requester_id.name,
+        avatar: exchange.requester_id.avatar,
+        rating: exchange.requester_id.rating
+      },
+      completedDate: exchange.completed_date,
+      rating: exchange.rating,
+      review: exchange.review,
+      sessionsCompleted: exchange.sessions_completed,
+      totalHours: exchange.total_hours
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: taughtSkills.length,
+      taughtSkills
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

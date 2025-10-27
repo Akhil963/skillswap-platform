@@ -7,7 +7,9 @@ const {
   updateExchangeStatus,
   addMessage,
   addReview,
-  deleteExchange
+  deleteExchange,
+  getLearnedSkills,
+  getTaughtSkills
 } = require('../controllers/exchangeController');
 const { protect } = require('../middleware/auth');
 
@@ -16,6 +18,8 @@ router.use(protect);
 
 router.post('/', createExchange);
 router.get('/', getUserExchanges);
+router.get('/learned', getLearnedSkills);
+router.get('/taught', getTaughtSkills);
 router.get('/:id', getExchangeById);
 router.put('/:id/status', updateExchangeStatus);
 router.post('/:id/messages', addMessage);

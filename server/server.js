@@ -19,6 +19,7 @@ const conversationRoutes = require('./routes/conversationRoutes');
 const contactRoutes = require('./routes/contactRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const adminAuthRoutes = require('./routes/adminAuthRoutes');
+const skillRoutes = require('./routes/skillRoutes');
 
 // Initialize express app
 const app = express();
@@ -86,6 +87,7 @@ app.use('/api/conversations', conversationRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin-auth', adminAuthRoutes);
+app.use('/api/skills', skillRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

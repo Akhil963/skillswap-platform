@@ -44,31 +44,33 @@ exports.getStats = async (req, res) => {
             ? Math.round((completedExchanges / totalExchanges) * 100)
             : 0;
         
-        // Recent users (last 5)
+        // Recent users (last 5) - use correct field names from User model
         const recentUsers = await User.find()
             .sort({ createdAt: -1 })
             .limit(5)
-            .select('fullName email profilePicture createdAt');
+            .select('name email avatar createdAt');
         
-        // Recent exchanges (last 5)
+        // Recent exchanges (last 5) - populate with correct field names
         const recentExchanges = await Exchange.find()
-            .sort({ createdAt: -1 })
+            .sort({ created_date: -1 })
             .limit(5)
-            .populate('requester_id', 'fullName')
-            .populate('provider_id', 'fullName');
+            .populate('requester_id', 'name email avatar')
+            .populate('provider_id', 'name email avatar')
+            .select('requester_id provider_id requested_skill offered_skill status created_date');
         
         res.json({
             success: true,
             stats: {
                 totalUsers,
                 totalExchanges,
-                averageRating: avgRating,
+                averageRating: parseFloat(avgRating.toFixed(1)),
                 successRate
             },
             recentUsers,
             recentExchanges
         });
     } catch (error) {
+        console.error('Error getting admin stats:', error);
         res.status(500).json({
             success: false,
             message: 'Error getting statistics',
@@ -153,19 +155,85 @@ exports.getUserById = async (req, res) => {
 // Update user
 exports.updateUser = async (req, res) => {
     try {
-        const { fullName, email, location, bio, profilePicture } = req.body;
+        const { name, fullName, email, location, bio, profilePicture, avatar, skills_offered, skills_wanted } = req.body;
         
         const updateData = {
-            fullName,
+            name: name || fullName, // Support both field names
             email,
             location,
             bio
         };
         
-        // Add profile picture if provided
+        // Add profile picture if provided (support both field names)
         if (profilePicture) {
-            updateData.profilePicture = profilePicture;
+            updateData.avatar = profilePicture;
+        } else if (avatar) {
+            updateData.avatar = avatar;
         }
+        
+        // Process skills if provided - fetch full skill data from Skill collection
+        if (skills_offered !== undefined) {
+            const Skill = require('../models/Skill');
+            const enrichedSkillsOffered = [];
+            
+            for (const skill of skills_offered) {
+                const skillName = skill.name || skill;
+                const fullSkill = await Skill.findOne({ name: skillName, isActive: true });
+                
+                if (fullSkill) {
+                    enrichedSkillsOffered.push({
+                        name: fullSkill.name,
+                        category: fullSkill.category,
+                        experience_level: skill.experience_level || 'Intermediate',
+                        description: fullSkill.description || `Skilled in ${fullSkill.name}`
+                    });
+                } else {
+                    // If skill not found in database, use minimal data
+                    enrichedSkillsOffered.push({
+                        name: skillName,
+                        category: skill.category || 'Other',
+                        experience_level: skill.experience_level || 'Intermediate',
+                        description: skill.description || `Skilled in ${skillName}`
+                    });
+                }
+            }
+            updateData.skills_offered = enrichedSkillsOffered;
+        }
+        
+        if (skills_wanted !== undefined) {
+            const Skill = require('../models/Skill');
+            const enrichedSkillsWanted = [];
+            
+            for (const skill of skills_wanted) {
+                const skillName = skill.name || skill;
+                const fullSkill = await Skill.findOne({ name: skillName, isActive: true });
+                
+                if (fullSkill) {
+                    enrichedSkillsWanted.push({
+                        name: fullSkill.name,
+                        category: fullSkill.category,
+                        experience_level: skill.experience_level || 'Beginner',
+                        description: fullSkill.description || `Wants to learn ${fullSkill.name}`
+                    });
+                } else {
+                    // If skill not found in database, use minimal data
+                    enrichedSkillsWanted.push({
+                        name: skillName,
+                        category: skill.category || 'Other',
+                        experience_level: skill.experience_level || 'Beginner',
+                        description: skill.description || `Wants to learn ${skillName}`
+                    });
+                }
+            }
+            updateData.skills_wanted = enrichedSkillsWanted;
+        }
+        
+        // Remove undefined values
+        Object.keys(updateData).forEach(key => {
+            if (updateData[key] === undefined) {
+                delete updateData[key];
+            }
+        });
         
         const user = await User.findByIdAndUpdate(
             req.params.id,
@@ -186,6 +254,7 @@ exports.updateUser = async (req, res) => {
             user
         });
     } catch (error) {
+        console.error('Error updating user:', error);
         res.status(500).json({
             success: false,
             message: 'Error updating user',
