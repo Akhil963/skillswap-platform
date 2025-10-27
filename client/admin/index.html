@@ -274,19 +274,74 @@
             <div class="page-header">
                 <h2>Skills Management</h2>
                 <div class="page-actions">
-                    <input type="text" class="search-input" id="skillSearch" placeholder="Search skills..." oninput="searchSkills()">
+                    <input type="text" class="search-input" id="skillSearch" placeholder="🔍 Search skills..." oninput="searchSkills()">
                     <select class="filter-select" id="categoryFilter" onchange="filterSkills()">
                         <option value="all">All Categories</option>
-                        <option value="Programming">Programming</option>
-                        <option value="Design">Design</option>
-                        <option value="Marketing">Marketing</option>
-                        <option value="Languages">Languages</option>
-                        <option value="Business">Business</option>
+                        <option value="Programming & Development">Programming & Development</option>
+                        <option value="Design & Creative">Design & Creative</option>
+                        <option value="Business & Finance">Business & Finance</option>
+                        <option value="Marketing & Sales">Marketing & Sales</option>
+                        <option value="Writing & Translation">Writing & Translation</option>
+                        <option value="Music & Audio">Music & Audio</option>
+                        <option value="Video & Animation">Video & Animation</option>
+                        <option value="Photography">Photography</option>
+                        <option value="Health & Fitness">Health & Fitness</option>
+                        <option value="Teaching & Academics">Teaching & Academics</option>
+                        <option value="Lifestyle">Lifestyle</option>
+                        <option value="Data & Analytics">Data & Analytics</option>
+                        <option value="AI & Machine Learning">AI & Machine Learning</option>
+                        <option value="Other">Other</option>
                     </select>
+                    <select class="filter-select" id="statusFilter" onchange="filterSkills()">
+                        <option value="all">All Status</option>
+                        <option value="true">Active</option>
+                        <option value="false">Inactive</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="showAddSkillModal()">
+                        <i class="fas fa-plus"></i> Add Skill
+                    </button>
                 </div>
             </div>
-            <div class="skills-grid" id="skillsGrid">
-                <div class="loading">Loading skills...</div>
+            
+            <div class="stats-summary" style="margin-bottom: 24px;">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalSkillsCount">0</div>
+                    <div class="stat-label">Total Skills</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="activeSkillsCount">0</div>
+                    <div class="stat-label">Active Skills</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="categoriesCount">0</div>
+                    <div class="stat-label">Categories</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="popularSkillName">-</div>
+                    <div class="stat-label">Most Popular</div>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Skill Name</th>
+                            <th>Category</th>
+                            <th>Subcategory</th>
+                            <th>Tags</th>
+                            <th>Usage Count</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="skillsTableBody">
+                        <tr>
+                            <td colspan="8" class="loading">Loading skills...</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </section>
 
@@ -544,6 +599,84 @@
                     <button class="btn btn-danger" id="confirmBtn">Confirm</button>
                     <button class="btn btn-secondary" onclick="closeModal('confirmModal')">Cancel</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Skill Modal -->
+    <div class="modal" id="skillModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="skillModalTitle">Add New Skill</h3>
+                <button class="modal-close" onclick="closeModal('skillModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="skillForm" onsubmit="saveSkill(event)">
+                    <input type="hidden" id="skillId">
+                    
+                    <div class="form-group">
+                        <label for="skillName">Skill Name *</label>
+                        <input type="text" id="skillName" class="form-control" required maxlength="100" 
+                               placeholder="e.g., JavaScript, Graphic Design, Digital Marketing">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="skillCategory">Category *</label>
+                        <select id="skillCategory" class="form-control" required>
+                            <option value="">Select Category</option>
+                            <option value="Programming & Development">Programming & Development</option>
+                            <option value="Design & Creative">Design & Creative</option>
+                            <option value="Business & Finance">Business & Finance</option>
+                            <option value="Marketing & Sales">Marketing & Sales</option>
+                            <option value="Writing & Translation">Writing & Translation</option>
+                            <option value="Music & Audio">Music & Audio</option>
+                            <option value="Video & Animation">Video & Animation</option>
+                            <option value="Photography">Photography</option>
+                            <option value="Health & Fitness">Health & Fitness</option>
+                            <option value="Teaching & Academics">Teaching & Academics</option>
+                            <option value="Lifestyle">Lifestyle</option>
+                            <option value="Data & Analytics">Data & Analytics</option>
+                            <option value="AI & Machine Learning">AI & Machine Learning</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="skillSubcategory">Subcategory (Optional)</label>
+                        <input type="text" id="skillSubcategory" class="form-control" maxlength="100" 
+                               placeholder="e.g., Frontend, UI/UX, SEO">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="skillDescription">Description (Optional)</label>
+                        <textarea id="skillDescription" class="form-control" rows="3" maxlength="500" 
+                                  placeholder="Brief description of this skill..."></textarea>
+                        <small class="form-text">Max 500 characters</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="skillTags">Tags (Optional)</label>
+                        <input type="text" id="skillTags" class="form-control" 
+                               placeholder="Separate tags with commas (e.g., web, coding, frontend)">
+                        <small class="form-text">Comma-separated tags for better searchability</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="skillIsActive" checked>
+                            <span>Active (visible to users)</span>
+                        </label>
+                    </div>
+                    
+                    <div class="modal-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save Skill
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('skillModal')">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

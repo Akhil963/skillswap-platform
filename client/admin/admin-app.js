@@ -84,8 +84,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function initializeAdmin() {
-    // Load initial data
-    navigateToPage('dashboard');
+    // Get last active page from localStorage or default to dashboard
+    const lastPage = localStorage.getItem('adminCurrentPage') || 'dashboard';
+    
+    // Load the last active page
+    navigateToPage(lastPage);
     
     // Check database connection
     checkDatabaseConnection();
@@ -147,6 +150,9 @@ function navigateToPage(pageId) {
     document.getElementById('pageTitle').textContent = titles[pageId] || 'Dashboard';
     
     currentPage = pageId;
+    
+    // Save current page to localStorage for reload persistence
+    localStorage.setItem('adminCurrentPage', pageId);
     
     // Close sidebar on mobile after navigation
     if (window.innerWidth <= 1024) {
@@ -424,15 +430,34 @@ function displayRecentUsers(users) {
         return;
     }
     
-    const html = users.map(user => `
-        <div class="user-cell" style="padding: 12px; border-bottom: 1px solid var(--border-color);">
-            <img src="${user.profilePicture || '/default-avatar.png'}" class="user-avatar" alt="${user.fullName}">
-            <div class="user-info">
-                <span class="user-name">${user.fullName}</span>
-                <span class="user-email">${user.email}</span>
+    const html = users.map(user => {
+        // Use correct property names from User model: name, email, avatar
+        const userName = user.name || 'Unknown User';
+        const userEmail = user.email || 'No email';
+        const userAvatar = user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=random`;
+        const joinedDate = user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently';
+        
+        return `
+        <div class="user-cell" style="padding: 16px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 12px; transition: background 0.2s;">
+            <img src="${userAvatar}" 
+                 class="user-avatar" 
+                 alt="${userName}"
+                 style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary);"
+                 onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=random'">
+            <div class="user-info" style="flex: 1; min-width: 0;">
+                <div class="user-name" style="font-weight: 600; color: var(--text-primary); font-size: 14px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    ${userName}
+                </div>
+                <div class="user-email" style="font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    📧 ${userEmail}
+                </div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+                    📅 Joined ${joinedDate}
+                </div>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
     
     container.innerHTML = html;
 }
@@ -445,19 +470,118 @@ function displayRecentExchanges(exchanges) {
         return;
     }
     
-    const html = exchanges.map(exchange => `
-        <div style="padding: 12px; border-bottom: 1px solid var(--border-color);">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                <strong>${exchange.requester?.fullName || 'Unknown'} ↔️ ${exchange.provider?.fullName || 'Unknown'}</strong>
-                <span class="status-badge ${exchange.status}">${exchange.status}</span>
+    const html = exchanges.map(exchange => {
+        // Use correct property names from Exchange model
+        const requester = exchange.requester_id || {};
+        const provider = exchange.provider_id || {};
+        
+        const requesterName = requester.name || 'Unknown User';
+        const providerName = provider.name || 'Unknown User';
+        const requesterAvatar = requester.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(requesterName)}&background=4f46e5`;
+        const providerAvatar = provider.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(providerName)}&background=0891b2`;
+        const requesterEmail = requester.email || '';
+        const providerEmail = provider.email || '';
+        
+        const requestedSkill = exchange.requested_skill || 'Unknown Skill';
+        const offeredSkill = exchange.offered_skill || 'Unknown Skill';
+        const status = exchange.status || 'pending';
+        const createdDate = exchange.created_date || exchange.createdAt;
+        const timeAgo = createdDate ? getTimeAgo(new Date(createdDate)) : 'Recently';
+        
+        // Status colors
+        const statusColors = {
+            'pending': 'background: #fef3c7; color: #92400e;',
+            'accepted': 'background: #dbeafe; color: #1e40af;',
+            'in_progress': 'background: #e0e7ff; color: #4338ca;',
+            'completed': 'background: #d1fae5; color: #065f46;',
+            'cancelled': 'background: #fee2e2; color: #991b1b;',
+            'rejected': 'background: #fee2e2; color: #991b1b;',
+            'active': 'background: #d1fae5; color: #065f46;'
+        };
+        const statusStyle = statusColors[status] || statusColors.pending;
+        
+        return `
+        <div class="exchange-item" style="padding: 16px; border-bottom: 1px solid var(--border-color); transition: background 0.2s; cursor: pointer;" onclick="viewExchangeDetails('${exchange._id}')">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                    <img src="${requesterAvatar}" 
+                         alt="${requesterName}"
+                         style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid #4f46e5;"
+                         onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(requesterName)}&background=4f46e5'">
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 600; font-size: 13px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${requesterName}
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${requesterEmail ? '📧 ' + requesterEmail : 'Requester'}
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="font-size: 20px; color: var(--text-secondary);">↔️</div>
+                
+                <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                    <img src="${providerAvatar}" 
+                         alt="${providerName}"
+                         style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid #0891b2;"
+                         onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(providerName)}&background=0891b2'">
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 600; font-size: 13px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${providerName}
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            ${providerEmail ? '📧 ' + providerEmail : 'Provider'}
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div style="font-size: 12px; color: var(--text-secondary);">
-                ${exchange.skillOffered} ↔️ ${exchange.skillWanted}
+            
+            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px; font-size: 12px; flex-wrap: wrap;">
+                <span style="background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-weight: 500;">
+                    📚 ${requestedSkill}
+                </span>
+                <span style="color: var(--text-secondary);">↔️</span>
+                <span style="background: #d1fae5; color: #065f46; padding: 4px 8px; border-radius: 4px; font-weight: 500;">
+                    🎯 ${offeredSkill}
+                </span>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="status-badge" style="${statusStyle} padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase;">
+                    ${status.replace('_', ' ')}
+                </span>
+                <span style="font-size: 11px; color: var(--text-secondary);">
+                    🕐 ${timeAgo}
+                </span>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
     
     container.innerHTML = html;
+}
+
+// Helper function to get time ago
+function getTimeAgo(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    
+    const intervals = {
+        year: 31536000,
+        month: 2592000,
+        week: 604800,
+        day: 86400,
+        hour: 3600,
+        minute: 60
+    };
+    
+    for (const [unit, secondsInUnit] of Object.entries(intervals)) {
+        const interval = Math.floor(seconds / secondsInUnit);
+        if (interval >= 1) {
+            return `${interval} ${unit}${interval > 1 ? 's' : ''} ago`;
+        }
+    }
+    
+    return 'Just now';
 }
 
 // ===== USERS MANAGEMENT =====
@@ -686,13 +810,99 @@ async function viewUserDetails(userId) {
         if (data.success && data.user) {
             const user = data.user;
             
-            const skillsOfferedHTML = (user.skillsOffered || []).length > 0
-                ? user.skillsOffered.map(skill => `<span class="skill-tag">🎯 ${skill}</span>`).join('')
-                : '<p style="color: var(--text-secondary);">No skills offered</p>';
+            // Function to group skills by category
+            const groupSkillsByCategory = (skills) => {
+                const grouped = {};
+                skills.forEach(skill => {
+                    const skillName = skill.name || skill;
+                    const category = skill.category || 'Other';
+                    if (!grouped[category]) {
+                        grouped[category] = [];
+                    }
+                    grouped[category].push(skillName);
+                });
+                return grouped;
+            };
             
-            const skillsWantedHTML = (user.skillsWanted || []).length > 0
-                ? user.skillsWanted.map(skill => `<span class="skill-tag">📚 ${skill}</span>`).join('')
-                : '<p style="color: var(--text-secondary);">No skills wanted</p>';
+            // Function to create categorized skills HTML
+            const createCategorizedSkillsHTML = (skills, type) => {
+                if (!skills || skills.length === 0) {
+                    return '<p style="color: var(--text-secondary);">No skills added yet</p>';
+                }
+                
+                const grouped = groupSkillsByCategory(skills);
+                const categoryEmojis = {
+                    'Programming': '💻',
+                    'Design': '🎨',
+                    'Marketing': '📢',
+                    'Business': '💼',
+                    'Writing': '✍️',
+                    'Data Science': '📊',
+                    'AI & Machine Learning': '🤖',
+                    'Video Editing': '🎬',
+                    'Music': '🎵',
+                    'Photography': '📷',
+                    'Teaching': '👨‍🏫',
+                    'Health & Fitness': '💪',
+                    'Lifestyle': '🌟',
+                    'Other': '📌'
+                };
+                
+                const categoryColors = {
+                    'Programming': type === 'offered' ? '#4f46e5' : '#3b82f6',
+                    'Design': type === 'offered' ? '#ec4899' : '#f472b6',
+                    'Marketing': type === 'offered' ? '#f59e0b' : '#fbbf24',
+                    'Business': type === 'offered' ? '#10b981' : '#34d399',
+                    'Writing': type === 'offered' ? '#8b5cf6' : '#a78bfa',
+                    'Data Science': type === 'offered' ? '#06b6d4' : '#22d3ee',
+                    'AI & Machine Learning': type === 'offered' ? '#ef4444' : '#f87171',
+                    'Video Editing': type === 'offered' ? '#6366f1' : '#818cf8',
+                    'Music': type === 'offered' ? '#f97316' : '#fb923c',
+                    'Photography': type === 'offered' ? '#14b8a6' : '#2dd4bf',
+                    'Teaching': type === 'offered' ? '#a855f7' : '#c084fc',
+                    'Health & Fitness': type === 'offered' ? '#059669' : '#10b981',
+                    'Lifestyle': type === 'offered' ? '#d946ef' : '#e879f9',
+                    'Other': type === 'offered' ? '#6b7280' : '#9ca3af'
+                };
+                
+                let html = '';
+                Object.keys(grouped).sort().forEach(category => {
+                    const emoji = categoryEmojis[category] || '📌';
+                    const categoryColor = categoryColors[category] || (type === 'offered' ? 'var(--primary)' : 'var(--info)');
+                    
+                    html += `
+                        <div style="margin-bottom: 20px; background: var(--bg-secondary); padding: 16px; border-radius: 12px; border-left: 4px solid ${categoryColor};">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                <span style="font-size: 24px;">${emoji}</span>
+                                <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.8px;">
+                                    ${category}
+                                </h4>
+                                <span style="background: ${categoryColor}; color: white; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700;">
+                                    ${grouped[category].length} ${grouped[category].length === 1 ? 'Skill' : 'Skills'}
+                                </span>
+                            </div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                                ${grouped[category].map(skillName => `
+                                    <div style="background: linear-gradient(135deg, ${categoryColor} 0%, ${categoryColor}dd 100%); color: white; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 500; display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: transform 0.2s; cursor: default;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.15)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 4px rgba(0,0,0,0.1)'">
+                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                            <span style="font-size: 14px;">${type === 'offered' ? '🎯' : '📚'}</span>
+                                            <span style="font-weight: 600; font-size: 14px;">${skillName}</span>
+                                        </div>
+                                        <span style="font-size: 10px; opacity: 0.9; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; padding-left: 20px;">
+                                            ${category}
+                                        </span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                return html;
+            };
+            
+            const skillsOfferedHTML = createCategorizedSkillsHTML(user.skills_offered || user.skillsOffered || [], 'offered');
+            const skillsWantedHTML = createCategorizedSkillsHTML(user.skills_wanted || user.skillsWanted || [], 'wanted');
             
             const reviewsHTML = (user.reviews || []).length > 0
                 ? user.reviews.map(review => `
@@ -791,18 +1001,102 @@ async function viewUserDetails(userId) {
 
 async function editUser(userId) {
     try {
-        const response = await fetch(`/api/admin/users/${userId}`, {
-            headers: getAuthHeaders()
-        });
+        // Fetch user data and available skills in parallel
+        const [userResponse, skillsResponse] = await Promise.all([
+            fetch(`/api/admin/users/${userId}`, { headers: getAuthHeaders() }),
+            fetch('/api/skills?isActive=true', { headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` } })
+        ]);
         
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+        if (!userResponse.ok) {
+            throw new Error(`HTTP ${userResponse.status}`);
         }
         
-        const data = await response.json();
+        const userData = await userResponse.json();
+        const skillsData = skillsResponse.ok ? await skillsResponse.json() : { success: false, skills: [] };
         
-        if (data.success && data.user) {
-            const user = data.user;
+        if (userData.success && userData.user) {
+            const user = userData.user;
+            const availableSkills = skillsData.success ? skillsData.skills : [];
+            
+            // Group skills by category
+            const skillsByCategory = {};
+            availableSkills.forEach(skill => {
+                if (!skillsByCategory[skill.category]) {
+                    skillsByCategory[skill.category] = [];
+                }
+                skillsByCategory[skill.category].push(skill);
+            });
+            
+            // Get user's current skills
+            const userSkillsOffered = user.skills_offered || [];
+            const userSkillsWanted = user.skills_wanted || [];
+            
+            // Create skills selector HTML
+            const createSkillsSelector = (type, currentSkills) => {
+                const id = type === 'offered' ? 'editUserSkillsOffered' : 'editUserSkillsWanted';
+                const label = type === 'offered' ? '🎯 Skills You Offer' : '📚 Skills You Want';
+                const defaultLevel = type === 'offered' ? 'Intermediate' : 'Beginner';
+                
+                let html = `
+                    <div class="setting-item">
+                        <label>${label}</label>
+                        <div style="margin-bottom: 10px; display: grid; grid-template-columns: 1fr auto; gap: 8px;">
+                            <select id="${id}Selector" class="form-control">
+                                <option value="">Select a skill to add...</option>
+                `;
+                
+                // Group options by category
+                Object.keys(skillsByCategory).sort().forEach(category => {
+                    html += `<optgroup label="${category}">`;
+                    skillsByCategory[category].forEach(skill => {
+                        html += `<option value="${skill._id}" data-name="${skill.name}" data-category="${skill.category}">${skill.name}</option>`;
+                    });
+                    html += `</optgroup>`;
+                });
+                
+                html += `
+                            </select>
+                            <select id="${id}LevelSelector" class="form-control" style="width: 140px;">
+                                <option value="Beginner" ${defaultLevel === 'Beginner' ? 'selected' : ''}>Beginner</option>
+                                <option value="Intermediate" ${defaultLevel === 'Intermediate' ? 'selected' : ''}>Intermediate</option>
+                                <option value="Advanced">Advanced</option>
+                                <option value="Expert">Expert</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-sm" onclick="addSkillToList('${type}')" style="width: 100%; background: var(--primary); color: white; margin-bottom: 10px;">
+                            <i class="fas fa-plus"></i> Add Skill
+                        </button>
+                        <div id="${id}Container" class="skills-container" style="min-height: 60px; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; background: var(--bg-secondary);">
+                `;
+                
+                // Display current skills
+                currentSkills.forEach(skill => {
+                    const skillName = skill.name || skill;
+                    const skillCategory = skill.category || '';
+                    const skillLevel = skill.experience_level || defaultLevel;
+                    html += `
+                        <div class="skill-badge" data-skill-name="${skillName}" data-skill-level="${skillLevel}" style="display: inline-flex; align-items: center; gap: 6px; background: var(--primary); color: white; padding: 6px 12px; border-radius: 16px; margin: 4px; font-size: 13px;">
+                            <span>${skillName}</span>
+                            ${skillCategory ? `<span style="opacity: 0.7; font-size: 11px;">(${skillCategory})</span>` : ''}
+                            <span style="opacity: 0.8; font-size: 10px; background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px;">${skillLevel}</span>
+                            <button type="button" onclick="removeSkillFromList('${type}', '${skillName}')" style="background: none; border: none; color: white; cursor: pointer; padding: 0; margin-left: 4px; font-size: 16px;">
+                                ×
+                            </button>
+                        </div>
+                    `;
+                });
+                
+                if (currentSkills.length === 0) {
+                    html += '<p style="color: var(--text-secondary); margin: 0; text-align: center;">No skills added yet</p>';
+                }
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+                
+                return html;
+            };
             
             // Populate modal with form
             const modalBody = document.getElementById('editUserForm');
@@ -812,7 +1106,7 @@ async function editUser(userId) {
                 <div class="setting-item" style="text-align: center; margin-bottom: 20px;">
                     <label style="display: block; margin-bottom: 10px;">Profile Picture</label>
                     <div style="position: relative; display: inline-block;">
-                        <img id="profilePicPreview" src="${user.profilePicture || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.fullName || 'User')}" 
+                        <img id="profilePicPreview" src="${user.profilePicture || user.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name || 'User')}" 
                              style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary);" 
                              alt="Profile Picture">
                         <label for="profilePicInput" style="position: absolute; bottom: 0; right: 0; background: var(--primary); color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
@@ -825,7 +1119,7 @@ async function editUser(userId) {
                 
                 <div class="setting-item">
                     <label>Full Name</label>
-                    <input type="text" class="form-control" id="editUserName" value="${user.fullName || ''}" required>
+                    <input type="text" class="form-control" id="editUserName" value="${user.name || user.fullName || ''}" required>
                 </div>
                 <div class="setting-item">
                     <label>Email</label>
@@ -839,6 +1133,10 @@ async function editUser(userId) {
                     <label>Bio</label>
                     <textarea class="form-control" id="editUserBio" rows="4">${user.bio || ''}</textarea>
                 </div>
+                
+                ${createSkillsSelector('offered', userSkillsOffered)}
+                ${createSkillsSelector('wanted', userSkillsWanted)}
+                
                 <div class="modal-actions">
                     <button class="btn btn-primary" onclick="saveUser()">💾 Save Changes</button>
                     <button class="btn btn-secondary" onclick="closeModal('editUserModal')">Cancel</button>
@@ -855,13 +1153,106 @@ async function editUser(userId) {
     }
 }
 
+// Add skill to list
+function addSkillToList(type) {
+    const selectorId = type === 'offered' ? 'editUserSkillsOfferedSelector' : 'editUserSkillsWantedSelector';
+    const levelSelectorId = type === 'offered' ? 'editUserSkillsOfferedLevelSelector' : 'editUserSkillsWantedLevelSelector';
+    const containerId = type === 'offered' ? 'editUserSkillsOfferedContainer' : 'editUserSkillsWantedContainer';
+    
+    const selector = document.getElementById(selectorId);
+    const levelSelector = document.getElementById(levelSelectorId);
+    const container = document.getElementById(containerId);
+    
+    if (!selector || !container || !levelSelector) return;
+    
+    const selectedOption = selector.options[selector.selectedIndex];
+    if (!selectedOption || !selectedOption.value) return;
+    
+    const skillName = selectedOption.getAttribute('data-name');
+    const skillCategory = selectedOption.getAttribute('data-category');
+    const skillLevel = levelSelector.value;
+    
+    // Check if skill already exists
+    const existing = container.querySelector(`[data-skill-name="${skillName}"]`);
+    if (existing) {
+        showNotification('Skill already added!', 'error');
+        return;
+    }
+    
+    // Remove empty message if exists
+    const emptyMsg = container.querySelector('p');
+    if (emptyMsg) emptyMsg.remove();
+    
+    // Add skill badge
+    const skillBadge = document.createElement('div');
+    skillBadge.className = 'skill-badge';
+    skillBadge.setAttribute('data-skill-name', skillName);
+    skillBadge.setAttribute('data-skill-level', skillLevel);
+    skillBadge.style.cssText = 'display: inline-flex; align-items: center; gap: 6px; background: var(--primary); color: white; padding: 6px 12px; border-radius: 16px; margin: 4px; font-size: 13px;';
+    skillBadge.innerHTML = `
+        <span>${skillName}</span>
+        ${skillCategory ? `<span style="opacity: 0.7; font-size: 11px;">(${skillCategory})</span>` : ''}
+        <span style="opacity: 0.8; font-size: 10px; background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px;">${skillLevel}</span>
+        <button type="button" onclick="removeSkillFromList('${type}', '${skillName}')" style="background: none; border: none; color: white; cursor: pointer; padding: 0; margin-left: 4px; font-size: 16px;">
+            ×
+        </button>
+    `;
+    
+    container.appendChild(skillBadge);
+    
+    // Reset selectors
+    selector.selectedIndex = 0;
+    levelSelector.selectedIndex = type === 'offered' ? 1 : 0; // Reset to default (Intermediate for offered, Beginner for wanted)
+    
+    showNotification('Skill added! ✅', 'success');
+}
+
+// Remove skill from list
+function removeSkillFromList(type, skillName) {
+    const containerId = type === 'offered' ? 'editUserSkillsOfferedContainer' : 'editUserSkillsWantedContainer';
+    const container = document.getElementById(containerId);
+    
+    if (!container) return;
+    
+    const skillBadge = container.querySelector(`[data-skill-name="${skillName}"]`);
+    if (skillBadge) {
+        skillBadge.remove();
+    }
+    
+    // Add empty message if no skills left
+    if (container.children.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-secondary); margin: 0; text-align: center;">No skills added yet</p>';
+    }
+    
+    showNotification('Skill removed!', 'info');
+}
+
 async function saveUser() {
     const userId = document.getElementById('editUserId').value;
+    
+    // Get skills from containers with experience level
+    const getSkillsFromContainer = (containerId) => {
+        const container = document.getElementById(containerId);
+        if (!container) return [];
+        
+        const skillBadges = container.querySelectorAll('.skill-badge');
+        return Array.from(skillBadges).map(badge => {
+            const skillName = badge.getAttribute('data-skill-name');
+            const skillLevel = badge.getAttribute('data-skill-level');
+            return { 
+                name: skillName,
+                experience_level: skillLevel || 'Intermediate'
+            };
+        });
+    };
+    
     const userData = {
-        fullName: document.getElementById('editUserName').value,
+        name: document.getElementById('editUserName').value,
         email: document.getElementById('editUserEmail').value,
         location: document.getElementById('editUserLocation').value,
-        bio: document.getElementById('editUserBio').value
+        bio: document.getElementById('editUserBio').value,
+        skills_offered: getSkillsFromContainer('editUserSkillsOfferedContainer'),
+        skills_wanted: getSkillsFromContainer('editUserSkillsWantedContainer')
     };
     
     // Add profile picture if uploaded
@@ -2933,6 +3324,7 @@ async function logout() {
             // Clear local storage and redirect
             localStorage.removeItem('adminToken');
             localStorage.removeItem('adminData');
+            localStorage.removeItem('adminCurrentPage'); // Clear saved page on logout
             window.location.href = 'admin-login.html';
         }
     }
@@ -3199,3 +3591,324 @@ window.addEventListener('orientationchange', () => {
         handleResponsiveLayout();
     }, 100);
 });
+
+// ===================================
+// SKILLS MANAGEMENT
+// ===================================
+
+let filteredSkills = [];
+
+// Load skills
+async function loadSkills() {
+    try {
+        const token = localStorage.getItem('adminToken');
+        const searchTerm = document.getElementById('skillSearch')?.value || '';
+        const category = document.getElementById('categoryFilter')?.value || 'all';
+        const isActive = document.getElementById('statusFilter')?.value || 'all';
+        
+        let url = '/api/skills?';
+        if (searchTerm) url += `search=${encodeURIComponent(searchTerm)}&`;
+        if (category !== 'all') url += `category=${encodeURIComponent(category)}&`;
+        if (isActive !== 'all') url += `isActive=${isActive}&`;
+        
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            allSkills = data.skills || [];
+            filteredSkills = allSkills;
+            displaySkills(filteredSkills);
+            updateSkillsStats();
+        } else {
+            throw new Error(data.message || 'Failed to load skills');
+        }
+    } catch (error) {
+        console.error('Error loading skills:', error);
+        const tbody = document.getElementById('skillsTableBody');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="8" class="error">❌ Error loading skills</td></tr>';
+        }
+    }
+}
+
+// Display skills in table
+function displaySkills(skills) {
+    const tbody = document.getElementById('skillsTableBody');
+    
+    if (!tbody) return;
+    
+    if (!skills || skills.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="loading">No skills found</td></tr>';
+        return;
+    }
+    
+    const html = skills.map(skill => {
+        const statusClass = skill.isActive ? 'status-active' : 'status-inactive';
+        const statusText = skill.isActive ? '✅ Active' : '❌ Inactive';
+        const createdDate = new Date(skill.createdAt).toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+        });
+        const tags = skill.tags && skill.tags.length > 0 
+            ? skill.tags.slice(0, 3).map(tag => `<span class="tag">${tag}</span>`).join('') 
+            : '<span class="text-muted">-</span>';
+        
+        return `
+            <tr>
+                <td>
+                    <div style="font-weight: 600;">${skill.name}</div>
+                    ${skill.description ? `<div class="text-muted" style="font-size: 12px; margin-top: 4px;">${skill.description.substring(0, 60)}${skill.description.length > 60 ? '...' : ''}</div>` : ''}
+                </td>
+                <td>
+                    <span class="badge badge-category">${skill.category}</span>
+                </td>
+                <td>${skill.subcategory || '-'}</td>
+                <td>
+                    <div class="tags-container">${tags}</div>
+                </td>
+                <td>
+                    <span class="badge badge-info">${skill.usageCount || 0} uses</span>
+                </td>
+                <td>
+                    <span class="status-badge ${statusClass}">${statusText}</span>
+                </td>
+                <td>${createdDate}</td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-icon" onclick="editSkill('${skill._id}')" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn-icon btn-danger" onclick="confirmDeleteSkill('${skill._id}', '${skill.name}')" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    tbody.innerHTML = html;
+}
+
+// Update skills statistics
+function updateSkillsStats() {
+    const totalCount = allSkills.length;
+    const activeCount = allSkills.filter(s => s.isActive).length;
+    const categories = [...new Set(allSkills.map(s => s.category))].length;
+    const mostPopular = allSkills.reduce((max, skill) => 
+        skill.usageCount > (max?.usageCount || 0) ? skill : max, null
+    );
+    
+    document.getElementById('totalSkillsCount').textContent = totalCount;
+    document.getElementById('activeSkillsCount').textContent = activeCount;
+    document.getElementById('categoriesCount').textContent = categories;
+    document.getElementById('popularSkillName').textContent = mostPopular?.name || '-';
+}
+
+// Search skills
+function searchSkills() {
+    loadSkills();
+}
+
+// Filter skills
+function filterSkills() {
+    loadSkills();
+}
+
+// Show add skill modal
+function showAddSkillModal() {
+    document.getElementById('skillModalTitle').textContent = 'Add New Skill';
+    document.getElementById('skillForm').reset();
+    document.getElementById('skillId').value = '';
+    document.getElementById('skillIsActive').checked = true;
+    openModal('skillModal');
+}
+
+// Edit skill
+async function editSkill(skillId) {
+    try {
+        const token = localStorage.getItem('adminToken');
+        const response = await fetch(`/api/skills/${skillId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.skill) {
+            const skill = data.skill;
+            
+            document.getElementById('skillModalTitle').textContent = 'Edit Skill';
+            document.getElementById('skillId').value = skill._id;
+            document.getElementById('skillName').value = skill.name;
+            document.getElementById('skillCategory').value = skill.category;
+            document.getElementById('skillSubcategory').value = skill.subcategory || '';
+            document.getElementById('skillDescription').value = skill.description || '';
+            document.getElementById('skillTags').value = skill.tags ? skill.tags.join(', ') : '';
+            document.getElementById('skillIsActive').checked = skill.isActive;
+            
+            openModal('skillModal');
+        } else {
+            throw new Error(data.message || 'Failed to load skill');
+        }
+    } catch (error) {
+        console.error('Error loading skill:', error);
+        alert('Error loading skill details');
+    }
+}
+
+// Save skill (create or update)
+async function saveSkill(event) {
+    event.preventDefault();
+    
+    try {
+        const token = localStorage.getItem('adminToken');
+        const skillId = document.getElementById('skillId').value;
+        const tagsInput = document.getElementById('skillTags').value;
+        const tags = tagsInput ? tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag) : [];
+        
+        const skillData = {
+            name: document.getElementById('skillName').value.trim(),
+            category: document.getElementById('skillCategory').value,
+            subcategory: document.getElementById('skillSubcategory').value.trim(),
+            description: document.getElementById('skillDescription').value.trim(),
+            tags: tags,
+            isActive: document.getElementById('skillIsActive').checked
+        };
+        
+        const url = skillId ? `/api/skills/${skillId}` : '/api/skills';
+        const method = skillId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(skillData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            closeModal('skillModal');
+            loadSkills();
+            showNotification(skillId ? 'Skill updated successfully! ✅' : 'Skill created successfully! ✅', 'success');
+        } else {
+            throw new Error(data.message || 'Failed to save skill');
+        }
+    } catch (error) {
+        console.error('Error saving skill:', error);
+        alert(error.message || 'Error saving skill');
+    }
+}
+
+// Confirm delete skill
+function confirmDeleteSkill(skillId, skillName) {
+    document.getElementById('confirmMessage').textContent = 
+        `Are you sure you want to delete the skill "${skillName}"? This action cannot be undone.`;
+    
+    document.getElementById('confirmBtn').onclick = () => deleteSkill(skillId);
+    openModal('confirmModal');
+}
+
+// Delete skill
+async function deleteSkill(skillId) {
+    try {
+        const token = localStorage.getItem('adminToken');
+        
+        const response = await fetch(`/api/skills/${skillId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            closeModal('confirmModal');
+            loadSkills();
+            showNotification('Skill deleted successfully! ✅', 'success');
+        } else {
+            throw new Error(data.message || 'Failed to delete skill');
+        }
+    } catch (error) {
+        console.error('Error deleting skill:', error);
+        alert(error.message || 'Error deleting skill');
+    }
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+        color: white;
+        padding: 16px 24px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        z-index: 10000;
+        font-weight: 500;
+        animation: slideIn 0.3s ease-out;
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease-in';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
+// Add CSS animation for notifications
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from { transform: translateX(400px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(400px); opacity: 0; }
+    }
+    .tag {
+        display: inline-block;
+        background: #e0e7ff;
+        color: #4338ca;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        margin-right: 4px;
+        margin-bottom: 2px;
+    }
+    .badge-category {
+        background: #fef3c7;
+        color: #92400e;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .tags-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+`;
+document.head.appendChild(style);
+

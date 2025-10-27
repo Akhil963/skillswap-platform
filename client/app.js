@@ -220,8 +220,22 @@ async function initializeApp() {
     // Set up event listeners
     setupEventListeners();
 
-    // Render initial page
-    renderPage();
+    // Get last active page from localStorage or default to home
+    const lastPage = localStorage.getItem('currentPage');
+    
+    // If user is logged in and there's a saved page, navigate to it
+    if (lastPage && AppState.currentUser) {
+      // Check if the saved page requires authentication
+      const protectedPages = ['dashboard', 'exchanges', 'messages', 'settings', 'profile'];
+      if (protectedPages.includes(lastPage)) {
+        navigateToPage(lastPage);
+      } else {
+        renderPage();
+      }
+    } else {
+      // Render initial page (home or current page)
+      renderPage();
+    }
   } catch (error) {
     console.error('Initialization error:', error);
     showNotification('Error initializing app', 'error');
@@ -477,6 +491,7 @@ function handleLogout() {
   AppState.currentUser = null;
   AppState.token = null;
   localStorage.removeItem('token');
+  localStorage.removeItem('currentPage'); // Clear saved page on logout
   updateNavigation();
   showNotification('Logged out successfully!', 'success');
   navigateToPage('home');
@@ -488,6 +503,9 @@ function handleLogout() {
 
 function navigateToPage(page, userId = null) {
   AppState.currentPage = page;
+  
+  // Save current page to localStorage for reload persistence
+  localStorage.setItem('currentPage', page);
 
   // Update active nav links
   document.querySelectorAll('.nav-link').forEach(link => {
@@ -710,6 +728,8 @@ async function renderDashboard() {
   await renderActiveExchanges();
   renderUserBadges();
   await renderRecentMessages();
+  await renderLearnedSkills(); // Add learned skills section
+  await renderTaughtSkills(); // Add taught skills section
   
   // Show profile completion widget for new users
   renderProfileCompletion();
@@ -975,6 +995,146 @@ async function renderRecentMessages() {
   }
 }
 
+// Render learned skills section
+async function renderLearnedSkills() {
+  const learnedSkillsContainer = document.getElementById('learnedSkills');
+  if (!learnedSkillsContainer || !AppState.currentUser) return;
+
+  try {
+    const data = await apiRequest('/exchanges/learned');
+    const learnedSkills = data.learnedSkills;
+
+    if (learnedSkills.length === 0) {
+      learnedSkillsContainer.innerHTML = `
+        <div style="padding: 32px; text-align: center; background: var(--color-surface); border-radius: var(--radius-lg); border: 2px dashed var(--color-card-border);">
+          <div style="font-size: 48px; margin-bottom: 12px;">🎓</div>
+          <p style="color: var(--color-text-secondary); margin-bottom: 8px; font-weight: 500;">No skills learned yet</p>
+          <p style="font-size: 14px; color: var(--color-text-secondary);">Complete exchanges to build your learning history!</p>
+        </div>
+      `;
+      return;
+    }
+
+    learnedSkillsContainer.innerHTML = learnedSkills.slice(0, 5).map(item => `
+      <div class="learned-skill-card" style="background: var(--color-surface); padding: 16px; border-radius: var(--radius-lg); margin-bottom: 12px; border: 1px solid var(--color-card-border); transition: all 0.2s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'" onmouseout="this.style.boxShadow='none'">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+          <img src="${item.teacher.avatar}" 
+               alt="${item.teacher.name}"
+               style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--color-primary);"
+               onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(item.teacher.name)}'">
+          <div style="flex: 1;">
+            <div style="font-size: 15px; font-weight: 600; color: var(--color-text-primary); margin-bottom: 4px;">
+              🎓 ${item.skill}
+            </div>
+            <div style="font-size: 13px; color: var(--color-text-secondary);">
+              Learned from <span style="font-weight: 500; color: var(--color-primary); cursor: pointer;" onclick="navigateToPage('profile', '${item.teacher.id}')">${item.teacher.name}</span>
+            </div>
+          </div>
+          ${item.rating ? `
+            <div style="display: flex; align-items: center; gap: 4px; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: white; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;">
+              ⭐ ${item.rating.toFixed(1)}
+            </div>
+          ` : ''}
+        </div>
+        
+        ${item.review ? `
+          <div style="background: var(--color-bg); padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--color-primary);">
+            <p style="font-size: 13px; color: var(--color-text-secondary); font-style: italic; margin: 0;">"${item.review}"</p>
+          </div>
+        ` : ''}
+        
+        <div style="display: flex; gap: 16px; font-size: 12px; color: var(--color-text-secondary);">
+          <span>📅 Completed ${new Date(item.completedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+          ${item.sessionsCompleted ? `<span>📊 ${item.sessionsCompleted} sessions</span>` : ''}
+          ${item.totalHours ? `<span>⏱️ ${item.totalHours} hours</span>` : ''}
+        </div>
+      </div>
+    `).join('');
+    
+    // Add "View All" button if there are more skills
+    if (learnedSkills.length > 5) {
+      learnedSkillsContainer.innerHTML += `
+        <button class="btn btn--secondary btn--sm" onclick="navigateToPage('profile')" style="width: 100%; margin-top: 8px;">
+          View All ${learnedSkills.length} Learned Skills →
+        </button>
+      `;
+    }
+  } catch (error) {
+    console.error('Error loading learned skills:', error);
+    learnedSkillsContainer.innerHTML = '<p style="color: var(--color-text-secondary);">Error loading learned skills</p>';
+  }
+}
+
+// Render taught skills section
+async function renderTaughtSkills() {
+  const taughtSkillsContainer = document.getElementById('taughtSkills');
+  if (!taughtSkillsContainer || !AppState.currentUser) return;
+
+  try {
+    const data = await apiRequest('/exchanges/taught');
+    const taughtSkills = data.taughtSkills;
+
+    if (taughtSkills.length === 0) {
+      taughtSkillsContainer.innerHTML = `
+        <div style="padding: 32px; text-align: center; background: var(--color-surface); border-radius: var(--radius-lg); border: 2px dashed var(--color-card-border);">
+          <div style="font-size: 48px; margin-bottom: 12px;">👨‍🏫</div>
+          <p style="color: var(--color-text-secondary); margin-bottom: 8px; font-weight: 500;">No skills taught yet</p>
+          <p style="font-size: 14px; color: var(--color-text-secondary);">Share your knowledge and teach others!</p>
+        </div>
+      `;
+      return;
+    }
+
+    taughtSkillsContainer.innerHTML = taughtSkills.slice(0, 5).map(item => `
+      <div class="taught-skill-card" style="background: var(--color-surface); padding: 16px; border-radius: var(--radius-lg); margin-bottom: 12px; border: 1px solid var(--color-card-border); transition: all 0.2s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'" onmouseout="this.style.boxShadow='none'">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+          <img src="${item.student.avatar}" 
+               alt="${item.student.name}"
+               style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--color-success);"
+               onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(item.student.name)}'">
+          <div style="flex: 1;">
+            <div style="font-size: 15px; font-weight: 600; color: var(--color-text-primary); margin-bottom: 4px;">
+              👨‍🏫 ${item.skill}
+            </div>
+            <div style="font-size: 13px; color: var(--color-text-secondary);">
+              Taught to <span style="font-weight: 500; color: var(--color-success); cursor: pointer;" onclick="navigateToPage('profile', '${item.student.id}')">${item.student.name}</span>
+            </div>
+          </div>
+          ${item.rating ? `
+            <div style="display: flex; align-items: center; gap: 4px; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: white; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;">
+              ⭐ ${item.rating.toFixed(1)}
+            </div>
+          ` : ''}
+        </div>
+        
+        ${item.review ? `
+          <div style="background: var(--color-bg); padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--color-success);">
+            <p style="font-size: 13px; color: var(--color-text-secondary); font-style: italic; margin: 0;">"${item.review}"</p>
+          </div>
+        ` : ''}
+        
+        <div style="display: flex; gap: 16px; font-size: 12px; color: var(--color-text-secondary);">
+          <span>📅 Completed ${new Date(item.completedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+          ${item.sessionsCompleted ? `<span>📊 ${item.sessionsCompleted} sessions</span>` : ''}
+          ${item.totalHours ? `<span>⏱️ ${item.totalHours} hours</span>` : ''}
+        </div>
+      </div>
+    `).join('');
+    
+    // Add "View All" button if there are more skills
+    if (taughtSkills.length > 5) {
+      taughtSkillsContainer.innerHTML += `
+        <button class="btn btn--secondary btn--sm" onclick="navigateToPage('profile')" style="width: 100%; margin-top: 8px;">
+          View All ${taughtSkills.length} Taught Skills →
+        </button>
+      `;
+    }
+  } catch (error) {
+    console.error('Error loading taught skills:', error);
+    taughtSkillsContainer.innerHTML = '<p style="color: var(--color-text-secondary);">Error loading taught skills</p>';
+  }
+}
+
 // ======================
 // MARKETPLACE
 // ======================
@@ -1034,26 +1194,81 @@ function renderSkillsGrid(skills) {
     return;
   }
 
-  skillsMarketplace.innerHTML = skills.map(skill => `
-    <div class="marketplace-skill-card">
-      <div class="skill-header">
-        <img src="${skill.user.avatar}" alt="${skill.user.name}" class="skill-avatar">
-        <div class="skill-meta">
-          <h3 class="skill-title">${skill.name}</h3>
-          <p class="skill-user">by ${skill.user.name}</p>
+  // Get current user ID to filter out own skills
+  const currentUserId = AppState.currentUser?._id;
+
+  // Filter out skills from the current user
+  const filteredSkills = skills.filter(skill => skill.user._id !== currentUserId);
+
+  if (filteredSkills.length === 0) {
+    skillsMarketplace.innerHTML = `
+      <div style="padding: 40px; text-align: center;">
+        <p style="color: var(--color-text-secondary); margin-bottom: 12px;">No skills available from other users</p>
+        <p style="font-size: 14px; color: var(--color-text-secondary);">Add more skills to your profile or wait for other users to join!</p>
+      </div>
+    `;
+    return;
+  }
+
+  skillsMarketplace.innerHTML = filteredSkills.map(skill => {
+    const categoryColors = {
+      'Programming': '#4f46e5',
+      'Design': '#ec4899',
+      'Marketing': '#f59e0b',
+      'Business': '#10b981',
+      'Writing': '#8b5cf6',
+      'Data Science': '#06b6d4',
+      'AI & Machine Learning': '#ef4444',
+      'Video Editing': '#6366f1',
+      'Music': '#f97316',
+      'Photography': '#14b8a6',
+      'Teaching': '#a855f7',
+      'Health & Fitness': '#059669',
+      'Lifestyle': '#d946ef',
+      'Other': '#6b7280'
+    };
+    
+    const categoryColor = categoryColors[skill.category] || '#6b7280';
+    const userRating = skill.user?.rating || 0;
+    const userName = skill.user?.name || 'Unknown User';
+    const userAvatar = skill.user?.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(userName);
+    const userId = skill.user?._id;
+    
+    return `
+      <div class="marketplace-skill-card" style="border-left: 4px solid ${categoryColor};">
+        <div class="skill-header" style="cursor: pointer;" onclick="navigateToPage('profile', '${userId}')">
+          <img src="${userAvatar}" 
+               alt="${userName}" 
+               class="skill-avatar"
+               onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}'">
+          <div class="skill-meta">
+            <h3 class="skill-title">${skill.name}</h3>
+            <p class="skill-user" style="display: flex; align-items: center; gap: 6px;">
+              <span>by ${userName}</span>
+              <span style="color: var(--color-warning); font-size: 12px;">⭐ ${userRating.toFixed(1)}</span>
+            </p>
+          </div>
         </div>
+        <div class="skill-category" style="background: ${categoryColor}; color: white; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; display: inline-block; margin: 8px 0;">
+          ${skill.category}
+        </div>
+        <p class="skill-description" style="margin: 12px 0; color: var(--color-text-secondary); font-size: 14px; line-height: 1.5;">
+          ${skill.description || 'No description available'}
+        </p>
+        <div class="skill-footer" style="display: flex; justify-content: space-between; align-items: center; margin: 12px 0; padding-top: 12px; border-top: 1px solid var(--color-card-border);">
+          <span class="skill-level" style="background: var(--color-bg-1); padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 500;">
+            📚 ${skill.experience_level}
+          </span>
+          <span style="font-size: 12px; color: var(--color-text-secondary);">
+            User ID: ${userId.slice(-6)}
+          </span>
+        </div>
+        <button class="btn btn--primary btn--sm" style="width: 100%; margin-top: 12px;" onclick="openExchangeModal('${userId}', '${skill.name}')">
+          🤝 Request Exchange
+        </button>
       </div>
-      <div class="skill-category" style="background: var(--color-bg-1);">${skill.category}</div>
-      <p class="skill-description">${skill.description}</p>
-      <div class="skill-footer">
-        <span class="skill-level">${skill.experience_level}</span>
-        <span style="color: var(--color-warning);">⭐ ${skill.user.rating.toFixed(1)}</span>
-      </div>
-      <button class="btn btn--primary btn--sm" style="width: 100%; margin-top: 12px;" onclick="openExchangeModal('${skill.user._id}', '${skill.name}')">
-        Request Exchange
-      </button>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 // ======================
@@ -1157,11 +1372,145 @@ async function renderProfile(userId) {
               : '<p style="color: var(--color-text-secondary);">No badges yet - complete exchanges to earn them!</p>'}
           </div>
         </div>
+        
+        ${isOwnProfile ? `
+          <div class="profile-section">
+            <h3>🎓 Skills I Learned</h3>
+            <div id="profileLearnedSkills">
+              <p style="color: var(--color-text-secondary);">Loading...</p>
+            </div>
+          </div>
+          
+          <div class="profile-section">
+            <h3>👨‍🏫 Skills I Taught</h3>
+            <div id="profileTaughtSkills">
+              <p style="color: var(--color-text-secondary);">Loading...</p>
+            </div>
+          </div>
+        ` : ''}
       </div>
     `;
+    
+    // Load learned and taught skills for own profile
+    if (isOwnProfile) {
+      renderProfileLearnedSkills();
+      renderProfileTaughtSkills();
+    }
   } catch (error) {
     console.error('Error loading profile:', error);
     profileContainer.innerHTML = '<p style="color: var(--color-error); padding: 20px;">Error loading profile</p>';
+  }
+}
+
+// Render learned skills in profile page
+async function renderProfileLearnedSkills() {
+  const container = document.getElementById('profileLearnedSkills');
+  if (!container) return;
+
+  try {
+    const data = await apiRequest('/exchanges/learned');
+    const learnedSkills = data.learnedSkills;
+
+    if (learnedSkills.length === 0) {
+      container.innerHTML = `
+        <div style="padding: 24px; text-align: center; background: var(--color-surface); border-radius: var(--radius-lg); border: 2px dashed var(--color-card-border);">
+          <p style="color: var(--color-text-secondary); margin-bottom: 8px;">🎓 No skills learned yet</p>
+          <p style="font-size: 14px; color: var(--color-text-secondary);">Complete exchanges to build your learning history!</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = learnedSkills.map(item => `
+      <div class="skill-item" style="border-left: 3px solid var(--color-success);">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+          <img src="${item.teacher.avatar}" 
+               alt="${item.teacher.name}"
+               style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--color-success);"
+               onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(item.teacher.name)}'">
+          <div style="flex: 1;">
+            <div class="skill-item-header">
+              <span class="skill-item-name">🎓 ${item.skill}</span>
+              ${item.rating ? `<span class="skill-item-level" style="background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);">⭐ ${item.rating.toFixed(1)}</span>` : ''}
+            </div>
+            <p style="font-size: 13px; color: var(--color-text-secondary); margin: 4px 0 0 0;">
+              Learned from <span style="font-weight: 500; color: var(--color-primary); cursor: pointer;" onclick="navigateToPage('profile', '${item.teacher.id}')">${item.teacher.name}</span>
+            </p>
+          </div>
+        </div>
+        
+        ${item.review ? `
+          <p class="skill-item-description" style="background: var(--color-bg); padding: 10px; border-radius: 6px; font-style: italic; border-left: 2px solid var(--color-primary);">
+            "${item.review}"
+          </p>
+        ` : ''}
+        
+        <div style="display: flex; gap: 12px; font-size: 12px; color: var(--color-text-secondary); margin-top: 8px;">
+          <span>📅 ${new Date(item.completedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+          ${item.sessionsCompleted ? `<span>📊 ${item.sessionsCompleted} sessions</span>` : ''}
+          ${item.totalHours ? `<span>⏱️ ${item.totalHours}h</span>` : ''}
+        </div>
+      </div>
+    `).join('');
+  } catch (error) {
+    console.error('Error loading learned skills:', error);
+    container.innerHTML = '<p style="color: var(--color-text-secondary);">Error loading learned skills</p>';
+  }
+}
+
+// Render taught skills in profile page
+async function renderProfileTaughtSkills() {
+  const container = document.getElementById('profileTaughtSkills');
+  if (!container) return;
+
+  try {
+    const data = await apiRequest('/exchanges/taught');
+    const taughtSkills = data.taughtSkills;
+
+    if (taughtSkills.length === 0) {
+      container.innerHTML = `
+        <div style="padding: 24px; text-align: center; background: var(--color-surface); border-radius: var(--radius-lg); border: 2px dashed var(--color-card-border);">
+          <p style="color: var(--color-text-secondary); margin-bottom: 8px;">👨‍🏫 No skills taught yet</p>
+          <p style="font-size: 14px; color: var(--color-text-secondary);">Share your knowledge and teach others!</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = taughtSkills.map(item => `
+      <div class="skill-item" style="border-left: 3px solid var(--color-info);">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+          <img src="${item.student.avatar}" 
+               alt="${item.student.name}"
+               style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--color-info);"
+               onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(item.student.name)}'">
+          <div style="flex: 1;">
+            <div class="skill-item-header">
+              <span class="skill-item-name">👨‍🏫 ${item.skill}</span>
+              ${item.rating ? `<span class="skill-item-level" style="background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);">⭐ ${item.rating.toFixed(1)}</span>` : ''}
+            </div>
+            <p style="font-size: 13px; color: var(--color-text-secondary); margin: 4px 0 0 0;">
+              Taught to <span style="font-weight: 500; color: var(--color-info); cursor: pointer;" onclick="navigateToPage('profile', '${item.student.id}')">${item.student.name}</span>
+            </p>
+          </div>
+        </div>
+        
+        ${item.review ? `
+          <p class="skill-item-description" style="background: var(--color-bg); padding: 10px; border-radius: 6px; font-style: italic; border-left: 2px solid var(--color-info);">
+            "${item.review}"
+          </p>
+        ` : ''}
+        
+        <div style="display: flex; gap: 12px; font-size: 12px; color: var(--color-text-secondary); margin-top: 8px;">
+          <span>📅 ${new Date(item.completedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+          ${item.sessionsCompleted ? `<span>📊 ${item.sessionsCompleted} sessions</span>` : ''}
+          ${item.totalHours ? `<span>⏱️ ${item.totalHours}h</span>` : ''}
+        </div>
+      </div>
+    `).join('');
+  } catch (error) {
+    console.error('Error loading taught skills:', error);
+    container.innerHTML = '<p style="color: var(--color-text-secondary);">Error loading taught skills</p>';
   }
 }
 
@@ -1538,29 +1887,79 @@ async function renderConversationsList() {
   if (!conversationsList) return;
 
   try {
+    conversationsList.innerHTML = '<p style="padding: 16px; color: var(--color-text-secondary);">Loading conversations...</p>';
+    
     const data = await apiRequest('/conversations');
-    AppState.conversations = data.conversations;
+    AppState.conversations = data.conversations || [];
 
-    if (AppState.conversations.length === 0) {
-      conversationsList.innerHTML = '<p style="padding: 16px; color: var(--color-text-secondary);">No conversations yet</p>';
+    if (!AppState.conversations || AppState.conversations.length === 0) {
+      conversationsList.innerHTML = `
+        <div style="padding: 24px; text-align: center;">
+          <p style="color: var(--color-text-secondary); margin-bottom: 12px;">💬 No conversations yet</p>
+          <p style="font-size: 14px; color: var(--color-text-secondary);">Start exchanging skills to begin chatting!</p>
+        </div>
+      `;
       return;
     }
 
     conversationsList.innerHTML = AppState.conversations.map(conv => {
-      const otherUser = conv.participants.find(p => p._id !== AppState.currentUser._id);
-      return `
-        <div class="conversation-item ${conv._id === AppState.activeConversation?._id ? 'active' : ''}"
-             onclick="selectConversation('${conv._id}')">
-          <img src="${otherUser.avatar}" alt="${otherUser.name}" class="conversation-avatar">
-          <div class="conversation-info">
-            <div class="conversation-name">${otherUser.name}</div>
-            <div class="conversation-preview">${conv.lastMessage?.content?.substring(0, 40) || 'No messages'}...</div>
+      try {
+        // Validate conversation data
+        if (!conv.participants || conv.participants.length < 2) {
+          console.warn('Invalid conversation: missing participants', conv);
+          return '';
+        }
+        
+        const otherUser = conv.participants.find(p => p._id !== AppState.currentUser._id);
+        
+        if (!otherUser || !otherUser.name) {
+          console.warn('Invalid conversation: missing other user', conv);
+          return '';
+        }
+        
+        const userName = otherUser.name || 'Unknown User';
+        const userAvatar = otherUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}`;
+        const lastMessageContent = conv.lastMessage?.content || 'No messages';
+        const previewText = lastMessageContent.substring(0, 40) + (lastMessageContent.length > 40 ? '...' : '');
+        
+        return `
+          <div class="conversation-item ${conv._id === AppState.activeConversation?._id ? 'active' : ''}"
+               onclick="selectConversation('${conv._id}')">
+            <img src="${userAvatar}" 
+                 alt="${userName}" 
+                 class="conversation-avatar"
+                 onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}'">
+            <div class="conversation-info">
+              <div class="conversation-name">${userName}</div>
+              <div class="conversation-preview">${previewText}</div>
+            </div>
           </div>
+        `;
+      } catch (convError) {
+        console.error('Error rendering conversation:', convError, conv);
+        return '';
+      }
+    }).filter(html => html).join('');
+    
+    // If no valid conversations rendered
+    if (conversationsList.innerHTML.trim() === '') {
+      conversationsList.innerHTML = `
+        <div style="padding: 24px; text-align: center;">
+          <p style="color: var(--color-text-secondary);">No valid conversations found</p>
         </div>
       `;
-    }).join('');
+    }
   } catch (error) {
-    conversationsList.innerHTML = '<p style="padding: 16px; color: var(--color-error);">Error loading conversations</p>';
+    console.error('Error loading conversations:', error);
+    conversationsList.innerHTML = `
+      <div style="padding: 24px; text-align: center;">
+        <p style="color: var(--color-error); margin-bottom: 12px;">❌ Error loading conversations</p>
+        <p style="font-size: 14px; color: var(--color-text-secondary);">${error.message || 'Please try again later'}</p>
+        <button class="btn btn--secondary btn--sm" onclick="renderConversationsList()" style="margin-top: 12px;">
+          🔄 Retry
+        </button>
+      </div>
+    `;
   }
 }
 
@@ -1568,6 +1967,10 @@ async function selectConversation(conversationId) {
   try {
     const data = await apiRequest(`/conversations/${conversationId}`);
     AppState.activeConversation = data.conversation;
+
+    if (!AppState.activeConversation.exchange_id || !AppState.activeConversation.exchange_id._id) {
+      throw new Error('Invalid exchange data');
+    }
 
     const exchangeData = await apiRequest(`/conversations/exchange/${AppState.activeConversation.exchange_id._id}`);
 
@@ -1578,46 +1981,158 @@ async function selectConversation(conversationId) {
     const chatAvatar = document.getElementById('chatAvatar');
     const chatUserName = document.getElementById('chatUserName');
 
+    if (!AppState.activeConversation.participants || AppState.activeConversation.participants.length < 2) {
+      throw new Error('Invalid conversation participants');
+    }
+
     const otherUser = AppState.activeConversation.participants.find(p => p._id !== AppState.currentUser._id);
+    
+    if (!otherUser) {
+      throw new Error('Could not find other participant');
+    }
+
+    // Show chat and hide sidebar on mobile
+    const messagesSidebar = document.querySelector('.messages-sidebar');
+    const messagesMain = document.querySelector('.messages-main');
+    if (messagesSidebar) messagesSidebar.classList.add('hidden');
+    if (messagesMain) messagesMain.classList.add('active');
 
     chatHeader.style.display = 'flex';
     chatInput.style.display = 'flex';
-    chatAvatar.src = otherUser.avatar;
-    chatUserName.textContent = otherUser.name;
+    chatAvatar.src = otherUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(otherUser.name || 'User')}`;
+    chatUserName.textContent = otherUser.name || 'Unknown User';
+    
+    // Add back button for mobile
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+      const existingBackBtn = chatHeader.querySelector('.chat-back-btn');
+      if (!existingBackBtn) {
+        const backBtn = document.createElement('button');
+        backBtn.className = 'chat-back-btn btn btn--secondary btn--sm';
+        backBtn.innerHTML = '← Back';
+        backBtn.style.cssText = 'margin-right: 12px; padding: 6px 12px; font-size: 14px;';
+        backBtn.onclick = () => {
+          if (messagesSidebar) messagesSidebar.classList.remove('hidden');
+          if (messagesMain) messagesMain.classList.remove('active');
+        };
+        chatHeader.insertBefore(backBtn, chatHeader.firstChild);
+      }
+    }
 
-    chatMessages.innerHTML = exchangeData.messages.map(msg => `
-      <div class="message ${msg.user_id._id === AppState.currentUser._id ? 'own' : ''}">
-        <img src="${msg.user_id.avatar}" alt="${msg.user_id.name}" class="message-avatar">
-        <div class="message-content">
-          <div class="message-bubble">${msg.message}</div>
-          <div class="message-time">${new Date(msg.timestamp).toLocaleString()}</div>
+    const messages = exchangeData.messages || [];
+    
+    if (messages.length === 0) {
+      chatMessages.innerHTML = `
+        <div style="padding: 40px; text-align: center;">
+          <p style="color: var(--color-text-secondary); margin-bottom: 8px;">💬 No messages yet</p>
+          <p style="font-size: 14px; color: var(--color-text-secondary);">Start the conversation!</p>
         </div>
-      </div>
-    `).join('');
+      `;
+    } else {
+      chatMessages.innerHTML = messages.map(msg => {
+        const isOwnMessage = msg.user_id._id === AppState.currentUser._id;
+        const userName = msg.user_id.name || 'Unknown';
+        const userAvatar = msg.user_id.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}`;
+        const messageTime = new Date(msg.timestamp).toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        
+        // Escape HTML and preserve line breaks
+        const escapedMessage = (msg.message || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;')
+          .replace(/\n/g, '<br>');
+        
+        return `
+          <div class="message ${isOwnMessage ? 'own' : ''}">
+            <img src="${userAvatar}" 
+                 alt="${userName}" 
+                 class="message-avatar"
+                 onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}'">
+            <div class="message-content">
+              <div class="message-bubble">${escapedMessage}</div>
+              <div class="message-time">${messageTime}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
 
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
     // Update conversation list
     renderConversationsList();
   } catch (error) {
-    showNotification('Error loading conversation', 'error');
+    console.error('Error loading conversation:', error);
+    showNotification(error.message || 'Error loading conversation', 'error');
+    
+    // Clear chat if there's an error
+    const chatMessages = document.getElementById('chatMessages');
+    if (chatMessages) {
+      chatMessages.innerHTML = `
+        <div style="padding: 40px; text-align: center;">
+          <p style="color: var(--color-error); margin-bottom: 12px;">❌ Error loading messages</p>
+          <p style="font-size: 14px; color: var(--color-text-secondary);">${error.message || 'Please try again'}</p>
+          <button class="btn btn--secondary btn--sm" onclick="selectConversation('${conversationId}')" style="margin-top: 12px;">
+            🔄 Retry
+          </button>
+        </div>
+      `;
+    }
   }
 }
 
 async function sendMessage() {
   const messageInput = document.getElementById('messageInput');
-  if (!messageInput || !messageInput.value.trim() || !AppState.activeConversation) return;
+  const sendBtn = document.getElementById('sendMessageBtn');
+  
+  if (!messageInput || !messageInput.value.trim()) {
+    showNotification('Please enter a message', 'error');
+    return;
+  }
+  
+  if (!AppState.activeConversation) {
+    showNotification('No active conversation selected', 'error');
+    return;
+  }
+  
+  if (!AppState.activeConversation.exchange_id || !AppState.activeConversation.exchange_id._id) {
+    showNotification('Invalid conversation data', 'error');
+    return;
+  }
+
+  const messageText = messageInput.value.trim();
+  
+  // Disable input and button while sending
+  if (sendBtn) sendBtn.disabled = true;
+  messageInput.disabled = true;
 
   try {
     await apiRequest(`/exchanges/${AppState.activeConversation.exchange_id._id}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ message: messageInput.value.trim() })
+      body: JSON.stringify({ message: messageText })
     });
 
     messageInput.value = '';
+    
+    // Reload conversation to show new message
     await selectConversation(AppState.activeConversation._id);
+    
+    showNotification('Message sent!', 'success');
   } catch (error) {
-    showNotification('Error sending message', 'error');
+    console.error('Error sending message:', error);
+    showNotification(error.message || 'Error sending message', 'error');
+  } finally {
+    // Re-enable input and button
+    if (sendBtn) sendBtn.disabled = false;
+    messageInput.disabled = false;
+    messageInput.focus();
   }
 }
 
