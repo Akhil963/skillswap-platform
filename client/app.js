@@ -920,15 +920,17 @@ async function renderActiveExchanges() {
     const exchanges = data.exchanges;
 
     activeExchanges.innerHTML = exchanges.length > 0
-      ? exchanges.map(exchange => {
-          const otherUser = exchange.requester_id._id === AppState.currentUser._id
-            ? exchange.provider_id
-            : exchange.requester_id;
+      ? exchanges
+          .filter(exchange => exchange.requester_id && exchange.provider_id) // Skip exchanges with deleted users
+          .map(exchange => {
+            const otherUser = exchange.requester_id._id === AppState.currentUser._id
+              ? exchange.provider_id
+              : exchange.requester_id;
 
-          return `
-            <div class="exchange-card" style="background: var(--color-surface); padding: 16px; border-radius: var(--radius-lg); margin-bottom: 12px; border: 1px solid var(--color-card-border);">
-              <div class="flex items-center gap-8 mb-8">
-                <img src="${otherUser.avatar}" alt="${otherUser.name}"
+            return `
+              <div class="exchange-card" style="background: var(--color-surface); padding: 16px; border-radius: var(--radius-lg); margin-bottom: 12px; border: 1px solid var(--color-card-border);">
+                <div class="flex items-center gap-8 mb-8">
+                  <img src="${otherUser.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(otherUser.name || 'User')}" alt="${otherUser.name || 'User'}"
                      style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
                 <div>
                   <div style="font-weight: 500;">${otherUser.name}</div>
@@ -972,12 +974,17 @@ async function renderRecentMessages() {
     const conversations = data.conversations.slice(0, 3);
 
     recentMessages.innerHTML = conversations.length > 0
-      ? conversations.map(conv => {
-          const otherUser = conv.participants.find(p => p._id !== AppState.currentUser._id);
-          return `
-            <div class="message-preview" style="background: var(--color-surface); padding: 12px; border-radius: var(--radius-lg); margin-bottom: 8px; cursor: pointer; border: 1px solid var(--color-card-border);" onclick="navigateToPage('messages')">
-              <div class="flex items-center gap-8">
-                <img src="${otherUser.avatar}" alt="${otherUser.name}"
+      ? conversations
+          .filter(conv => {
+            const otherUser = conv.participants.find(p => p._id !== AppState.currentUser._id);
+            return otherUser; // Skip conversations where other user was deleted
+          })
+          .map(conv => {
+            const otherUser = conv.participants.find(p => p._id !== AppState.currentUser._id);
+            return `
+              <div class="message-preview" style="background: var(--color-surface); padding: 12px; border-radius: var(--radius-lg); margin-bottom: 8px; cursor: pointer; border: 1px solid var(--color-card-border);" onclick="navigateToPage('messages')">
+                <div class="flex items-center gap-8">
+                  <img src="${otherUser.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(otherUser.name || 'User')}" alt="${otherUser.name || 'User'}"
                      style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">
                 <div style="flex: 1;">
                   <div style="font-size: 13px; font-weight: 500;">${otherUser.name}</div>
@@ -988,7 +995,7 @@ async function renderRecentMessages() {
               </div>
             </div>
           `;
-        }).join('')
+          }).join('')
       : '<p style="color: var(--color-text-secondary);">No recent messages</p>';
   } catch (error) {
     recentMessages.innerHTML = '<p style="color: var(--color-text-secondary);">Error loading messages</p>';
@@ -1548,18 +1555,30 @@ async function renderExchanges() {
     }
 
     exchangesList.innerHTML = exchanges.map(exchange => {
+      // Null check for user data
+      if (!exchange.requester_id || !exchange.provider_id) {
+        console.warn('Exchange has missing user data:', exchange);
+        return ''; // Skip this exchange
+      }
+
       const isRequester = exchange.requester_id._id === AppState.currentUser._id;
       const otherUser = isRequester ? exchange.provider_id : exchange.requester_id;
       const myRole = isRequester ? 'Learning' : 'Teaching';
       const mySkill = isRequester ? exchange.requested_skill : exchange.offered_skill;
 
+      // Additional safety check for otherUser
+      if (!otherUser) {
+        console.warn('Other user is null for exchange:', exchange);
+        return '';
+      }
+
       return `
         <div class="exchange-item">
           <div class="exchange-header">
             <div class="exchange-user-info">
-              <img src="${otherUser.avatar}" alt="${otherUser.name}" class="exchange-avatar">
+              <img src="${otherUser.avatar || '/assets/default-avatar.png'}" alt="${otherUser.name || 'User'}" class="exchange-avatar">
               <div class="exchange-user-details">
-                <h3>${otherUser.name}</h3>
+                <h3>${otherUser.name || 'Unknown User'}</h3>
                 <div class="exchange-user-rating">
                   ⭐ ${(otherUser.rating || 0).toFixed(1)} • ${otherUser.total_exchanges || 0} exchanges
                 </div>
@@ -1613,7 +1632,7 @@ async function renderExchanges() {
           </div>
         </div>
       `;
-    }).join('');
+    }).filter(html => html !== '').join('');
   } catch (error) {
     console.error('Error loading exchanges:', error);
     exchangesList.innerHTML = '<p style="color: var(--color-error); text-align: center; padding: 40px;">Error loading exchanges</p>';
@@ -1880,6 +1899,35 @@ async function renderMessages() {
   if (!AppState.currentUser) return;
 
   await renderConversationsList();
+
+  const messagesSidebar = document.querySelector('.messages-sidebar');
+  const messagesMain = document.querySelector('.messages-main');
+
+  const applyMessagesLayout = () => {
+    const isMobile = window.innerWidth <= 900;
+    if (!isMobile) {
+      messagesSidebar && messagesSidebar.classList.remove('hidden');
+      messagesMain && messagesMain.classList.remove('active');
+      return;
+    }
+    if (AppState.activeConversation) {
+      messagesSidebar && messagesSidebar.classList.add('hidden');
+      messagesMain && messagesMain.classList.add('active');
+    } else {
+      messagesSidebar && messagesSidebar.classList.remove('hidden');
+      messagesMain && messagesMain.classList.remove('active');
+    }
+  };
+
+  // Apply on load
+  applyMessagesLayout();
+
+  // Bind resize handler (deduplicated)
+  if (window.__messagesResizeHandler) {
+    window.removeEventListener('resize', window.__messagesResizeHandler);
+  }
+  window.__messagesResizeHandler = () => applyMessagesLayout();
+  window.addEventListener('resize', window.__messagesResizeHandler);
 }
 
 async function renderConversationsList() {
@@ -2029,17 +2077,36 @@ async function selectConversation(conversationId) {
         </div>
       `;
     } else {
-      chatMessages.innerHTML = messages.map(msg => {
+      const getStartOfDay = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+      const today = getStartOfDay(new Date());
+      const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+      const getDateLabel = (d) => {
+        const day = getStartOfDay(d).getTime();
+        if (day === today.getTime()) return 'Today';
+        if (day === yesterday.getTime()) return 'Yesterday';
+        return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      };
+
+      let prevLabel = '';
+      let html = '';
+
+      messages.forEach(msg => {
         const isOwnMessage = msg.user_id._id === AppState.currentUser._id;
         const userName = msg.user_id.name || 'Unknown';
         const userAvatar = msg.user_id.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}`;
-        const messageTime = new Date(msg.timestamp).toLocaleString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-        
+        const timeInline = new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        const timeBelow = timeInline;
+        const dateLabel = getDateLabel(msg.timestamp);
+
+        if (dateLabel !== prevLabel) {
+          html += `<div class="chat-date-separator"><span>${dateLabel}</span></div>`;
+          prevLabel = dateLabel;
+        }
+
+        // Determine status ticks for own messages
+        let status = 'sent';
+        if (msg.read === true) status = 'read'; else status = 'delivered';
+
         // Escape HTML and preserve line breaks
         const escapedMessage = (msg.message || '')
           .replace(/&/g, '&amp;')
@@ -2048,20 +2115,27 @@ async function selectConversation(conversationId) {
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#039;')
           .replace(/\n/g, '<br>');
-        
-        return `
+
+        html += `
           <div class="message ${isOwnMessage ? 'own' : ''}">
             <img src="${userAvatar}" 
                  alt="${userName}" 
                  class="message-avatar"
                  onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}'">
             <div class="message-content">
-              <div class="message-bubble">${escapedMessage}</div>
-              <div class="message-time">${messageTime}</div>
+              <div class="message-bubble">
+                ${escapedMessage}
+                <span class="message-meta">
+                  <span class="message-time-inline">${timeInline}</span>
+                  ${isOwnMessage ? `<span class="msg-status" data-status="${status}">${status === 'sent' ? '✓' : '✓✓'}</span>` : ''}
+                </span>
+              </div>
+              <div class="message-time">${timeBelow}</div>
             </div>
-          </div>
-        `;
-      }).join('');
+          </div>`;
+      });
+
+      chatMessages.innerHTML = html;
     }
 
     chatMessages.scrollTop = chatMessages.scrollHeight;

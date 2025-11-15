@@ -97,10 +97,15 @@ exports.getUserExchanges = async (req, res, next) => {
       .populate('provider_id', 'name email avatar rating')
       .sort({ created_date: -1 });
 
+    // Filter out exchanges with deleted users
+    const validExchanges = exchanges.filter(exchange => 
+      exchange.requester_id && exchange.provider_id
+    );
+
     res.status(200).json({
       success: true,
-      count: exchanges.length,
-      exchanges
+      count: validExchanges.length,
+      exchanges: validExchanges
     });
   } catch (error) {
     next(error);
@@ -479,21 +484,23 @@ exports.getLearnedSkills = async (req, res, next) => {
       .populate('provider_id', 'name email avatar rating total_exchanges')
       .sort({ completed_date: -1 });
 
-    // Format the learned skills data
-    const learnedSkills = learnedExchanges.map(exchange => ({
-      skill: exchange.requested_skill,
-      teacher: {
-        id: exchange.provider_id._id,
-        name: exchange.provider_id.name,
-        avatar: exchange.provider_id.avatar,
-        rating: exchange.provider_id.rating
-      },
-      completedDate: exchange.completed_date,
-      rating: exchange.rating,
-      review: exchange.review,
-      sessionsCompleted: exchange.sessions_completed,
-      totalHours: exchange.total_hours
-    }));
+    // Format the learned skills data (filter out exchanges with deleted users)
+    const learnedSkills = learnedExchanges
+      .filter(exchange => exchange.provider_id) // Skip if provider was deleted
+      .map(exchange => ({
+        skill: exchange.requested_skill,
+        teacher: {
+          id: exchange.provider_id._id,
+          name: exchange.provider_id.name,
+          avatar: exchange.provider_id.avatar,
+          rating: exchange.provider_id.rating
+        },
+        completedDate: exchange.completed_date,
+        rating: exchange.rating,
+        review: exchange.review,
+        sessionsCompleted: exchange.sessions_completed,
+        totalHours: exchange.total_hours
+      }));
 
     res.status(200).json({
       success: true,
@@ -518,21 +525,23 @@ exports.getTaughtSkills = async (req, res, next) => {
       .populate('requester_id', 'name email avatar rating total_exchanges')
       .sort({ completed_date: -1 });
 
-    // Format the taught skills data
-    const taughtSkills = taughtExchanges.map(exchange => ({
-      skill: exchange.offered_skill,
-      student: {
-        id: exchange.requester_id._id,
-        name: exchange.requester_id.name,
-        avatar: exchange.requester_id.avatar,
-        rating: exchange.requester_id.rating
-      },
-      completedDate: exchange.completed_date,
-      rating: exchange.rating,
-      review: exchange.review,
-      sessionsCompleted: exchange.sessions_completed,
-      totalHours: exchange.total_hours
-    }));
+    // Format the taught skills data (filter out exchanges with deleted users)
+    const taughtSkills = taughtExchanges
+      .filter(exchange => exchange.requester_id) // Skip if requester was deleted
+      .map(exchange => ({
+        skill: exchange.offered_skill,
+        student: {
+          id: exchange.requester_id._id,
+          name: exchange.requester_id.name,
+          avatar: exchange.requester_id.avatar,
+          rating: exchange.requester_id.rating
+        },
+        completedDate: exchange.completed_date,
+        rating: exchange.rating,
+        review: exchange.review,
+        sessionsCompleted: exchange.sessions_completed,
+        totalHours: exchange.total_hours
+      }));
 
     res.status(200).json({
       success: true,
